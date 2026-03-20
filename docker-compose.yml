@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: rizo_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: rizo
+      POSTGRES_PASSWORD: CHANGE_ME_LOCAL_PASSWORD
+      POSTGRES_DB: rizodb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: rizo_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
