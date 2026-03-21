@@ -8,19 +8,26 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  role      Role     @default(RIZADA)
-  tokens    Int      @default(0)
-  hairType  String?
-  avatar    String?
-  bio       String?
-  verified  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  posts     Post[]
-  tokenTxs  TokenTransaction[]
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  name                String?
+  password            String?
+  role                Role     @default(RIZADA)
+  tokens              Int      @default(0)
+  hairType            String?
+  avatar              String?
+  bio                 String?
+  verified            Boolean  @default(false)
+  stellarPublicKey    String?
+  stellarSecretKey    String?
+  onboardingCompleted Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  posts        Post[]
+  tokenTxs     TokenTransaction[]
+  appointments Appointment[]
+  reviews      Review[]
 }
 
 model Post {
@@ -46,16 +53,44 @@ model Product {
   category    String?
   hairTypes   String?
   createdAt   DateTime @default(now())
+
+  reviews Review[]
 }
 
-model TokenTransaction {
+model Review {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amount    Int
-  type      String
-  reason    String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating    Int
+  content   String?
   createdAt DateTime @default(now())
+}
+
+model TokenTransaction {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount          Int
+  type            String
+  reason          String
+  stellarTxHash   String?
+  createdAt       DateTime @default(now())
+}
+
+model Appointment {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stylistName  String
+  stylistId    String?
+  date         DateTime
+  tokensUsed   Int      @default(0)
+  usdcAmount   Float    @default(0)
+  status       String   @default("pending")
+  stellarTxHash String?
+  createdAt    DateTime @default(now())
 }
 
 enum Role {

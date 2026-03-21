@@ -1,7 +1,27 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://accesly.vercel.app",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accesly.vercel.app",
+              "font-src 'self' https://fonts.gstatic.com",
+              "frame-src 'self' https://accesly.vercel.app",
+              "connect-src 'self' https://accesly.vercel.app https://horizon-testnet.stellar.org wss://accesly.vercel.app",
+              "img-src 'self' data: https:",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

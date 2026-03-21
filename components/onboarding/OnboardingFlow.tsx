@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAccesly } from "accesly";
 
 const tiposCabello = [
   { id: "2a", titulo: "2A — Ondulado suave", desc: "Ondas ligeras en forma de S, cabello fino" },
@@ -21,19 +22,18 @@ const roles = [
 
 export default function OnboardingFlow() {
   const router = useRouter();
+  const { wallet } = useAccesly();
   const [paso, setPaso] = useState(1);
   const [rol, setRol] = useState("");
   const [tipoCabello, setTipoCabello] = useState("");
   const [nombre, setNombre] = useState("");
   const [bio, setBio] = useState("");
+  const [guardando, setGuardando] = useState(false);
 
-  // Si el rol es rizada: 3 pasos (rol → tipo cabello → perfil)
-  // Si el rol es marca/estilista: 2 pasos (rol → perfil)
   const totalPasos = rol === "rizada" ? 3 : 2;
 
   const handleContinuar = () => {
     if (paso === 1 && rol !== "rizada") {
-      // Marca/Estilista saltan directo al perfil
       setPaso(3);
     } else {
       setPaso(paso + 1);
@@ -55,6 +55,33 @@ export default function OnboardingFlow() {
     paso === 2 ? !tipoCabello :
     !nombre;
 
+  const handleEmpezar = async () => {
+    if (!nombre || !wallet?.email) return;
+    setGuardando(true);
+
+    try {
+      await fetch("/api/user/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-email": wallet.email,
+        },
+        body: JSON.stringify({
+          nombre,
+          bio,
+          rol,
+          tipoCabello,
+        }),
+      });
+      router.push("/comunidad");
+    } catch (error) {
+      console.error("Error al guardar perfil:", error);
+      router.push("/comunidad");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F5F0EA] flex flex-col items-center justify-center px-4 py-12">
       <div className="flex items-center gap-2 mb-8">
@@ -64,7 +91,6 @@ export default function OnboardingFlow() {
 
       <div className="w-full max-w-2xl bg-white rounded-3xl p-8 border border-[#EDE4D8] shadow-sm">
 
-        {/* Barra de progreso */}
         <div className="flex items-center gap-2 mb-8">
           {Array.from({ length: totalPasos }).map((_, i) => {
             const n = i + 1;
@@ -85,7 +111,6 @@ export default function OnboardingFlow() {
           })}
         </div>
 
-        {/* PASO 1 — Rol */}
         {paso === 1 && (
           <>
             <h1 className="text-2xl font-bold text-[#1a1a1a] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
@@ -112,17 +137,16 @@ export default function OnboardingFlow() {
           </>
         )}
 
-        {/* PASO 2 — Tipo de cabello (solo si es rizada) */}
         {paso === 2 && rol === "rizada" && (
-         <>
-    <h1 className="text-2xl font-bold text-[#1a1a1a] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
-      Cual es tu tipo de cabello?
-    </h1>
-    <p className="text-sm text-[#9a9a9a] mb-4">Paso 2 de 3</p>
-    <div className="w-full rounded-2xl overflow-hidden mb-6 border border-[#EDE4D8]">
-      <img src="/TipoRizo.jpeg" alt="Tipos de rizo" className="w-full object-cover" />
-    </div>
-    <div className="grid grid-cols-2 gap-3">
+          <>
+            <h1 className="text-2xl font-bold text-[#1a1a1a] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
+              Cual es tu tipo de cabello?
+            </h1>
+            <p className="text-sm text-[#9a9a9a] mb-4">Paso 2 de 3</p>
+            <div className="w-full rounded-2xl overflow-hidden mb-6 border border-[#EDE4D8]">
+              <img src="/TipoRizo.jpeg" alt="Tipos de rizo" className="w-full object-cover" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               {tiposCabello.map((tipo) => (
                 <button key={tipo.id} onClick={() => setTipoCabello(tipo.id)}
                   className="flex items-start gap-3 p-4 rounded-2xl border-2 text-left transition-all"
@@ -137,7 +161,6 @@ export default function OnboardingFlow() {
           </>
         )}
 
-        {/* PASO 3 — Perfil */}
         {paso === 3 && (
           <>
             <h1 className="text-2xl font-bold text-[#1a1a1a] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
@@ -152,19 +175,20 @@ export default function OnboardingFlow() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-[#5a5a5a]">Nombre o apodo</label>
-                <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Como te llamas?"
+                <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
+                  placeholder="Como te llamas?"
                   className="w-full bg-[#F5F0EA] border border-[#EDE4D8] rounded-xl px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#b0a89a] focus:outline-none focus:border-[#C4522A] transition-colors" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-[#5a5a5a]">Bio corta</label>
-                <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Cuentanos sobre tu cabello..." rows={3}
+                <textarea value={bio} onChange={(e) => setBio(e.target.value)}
+                  placeholder="Cuentanos sobre tu cabello..." rows={3}
                   className="w-full bg-[#F5F0EA] border border-[#EDE4D8] rounded-xl px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#b0a89a] focus:outline-none focus:border-[#C4522A] resize-none transition-colors" />
               </div>
             </div>
           </>
         )}
 
-        {/* Navegacion */}
         <div className="flex items-center justify-between mt-8">
           {paso > 1 ? (
             <button onClick={handleAtras} className="text-sm text-[#9a9a9a] hover:text-[#C4522A] transition-colors">
@@ -178,14 +202,14 @@ export default function OnboardingFlow() {
               Continuar
             </button>
           ) : (
-            <button onClick={() => router.push("/comunidad")} disabled={!nombre}
+            <button onClick={handleEmpezar} disabled={!nombre || guardando}
               className="bg-[#C4522A] text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-[#A03E1E] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-              Empezar
+              {guardando ? "Guardando..." : "Empezar"}
             </button>
           )}
         </div>
 
       </div>
     </div>
-  );
+  ); 
 }

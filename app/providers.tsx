@@ -1,5 +1,49 @@
 "use client";
-import { AcceslyProvider } from "accesly";
+import { AcceslyProvider, useAccesly } from "accesly";
+import { useEffect, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
+
+function AuthHandler({ children }: { children: React.ReactNode }) {
+  const { wallet } = useAccesly();
+  const router = useRouter();
+  const pathname = usePathname();
+  const prevWallet = useRef<any>(null);
+
+  useEffect(() => {
+    // Solo actuar cuando wallet cambia de null a objeto (momento de conexión)
+    const wasNull = prevWallet.current === null;
+    const isNowConnected = wallet !== null && wallet !== undefined;
+
+    if (wasNull && isNowConnected) {
+      if (pathname === "/onboarding") {
+        prevWallet.current = wallet;
+        return;
+      }
+
+      fetch("/api/auth/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stellarAddress: wallet.stellarAddress,
+          email: wallet.email,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.isNew) {
+            router.push("/onboarding");
+          } else {
+            router.push("/comunidad");
+          }
+        })
+        .catch((err) => console.error("error:", err));
+    }
+
+    prevWallet.current = wallet ?? null;
+  }, [wallet]);
+
+  return <>{children}</>;
+}
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -8,7 +52,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       network="testnet"
       theme="light"
     >
-      {children}
+      <AuthHandler>{children}</AuthHandler>
     </AcceslyProvider>
   );
 }
