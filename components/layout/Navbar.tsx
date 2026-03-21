@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAccesly } from "accesly";
 import AuthModal from "@/components/layout/AuthModal";
+import { useSession, signOut } from "next-auth/react";
 
 const links = [
   { label: "Comunidad", href: "/comunidad" },
@@ -16,6 +17,17 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const { wallet, disconnect } = useAccesly();
+  const { data: session } = useSession();
+
+  const estaLogueado = !!wallet || !!session?.user;
+  const userInicial = wallet?.email?.[0]?.toUpperCase()
+    || session?.user?.name?.[0]?.toUpperCase()
+    || "U";
+
+  const handleDesconectar = () => {
+    if (wallet) disconnect();
+    if (session?.user) signOut({ callbackUrl: "/" });
+  };
 
   return (
     <>
@@ -43,23 +55,30 @@ export default function Navbar() {
 
           {/* Derecha */}
           <div className="hidden md:flex items-center gap-3">
-            {wallet ? (
+            {estaLogueado ? (
               <div className="flex items-center gap-3">
                 <Link href="/recompensas"
                   className="flex items-center gap-1.5 bg-[#FDF5F2] border border-[#EDE4D8] px-3 py-1.5 rounded-full hover:bg-[#EDE4D8] transition-colors">
                   <span className="text-xs">🪙</span>
                   <span className="text-xs font-semibold text-[#C4522A]">
-                    {wallet.stellarAddress.slice(0, 4)}...{wallet.stellarAddress.slice(-4)}
+                    Tokens
                   </span>
                 </Link>
                 <div className="relative group">
-                  <Link href="/perfil"
-                    className="w-8 h-8 rounded-full bg-[#C4522A] flex items-center justify-center cursor-pointer">
+                  <button className="w-8 h-8 rounded-full bg-[#C4522A] flex items-center justify-center cursor-pointer">
                     <span className="text-xs font-bold text-white">
-                      {wallet.email?.[0]?.toUpperCase() ?? "R"}
+                      {userInicial}
                     </span>
-                  </Link>
-                  <div className="absolute right-0 top-10 bg-white border border-[#EDE4D8] rounded-xl shadow-md py-1 min-w-32 hidden group-hover:block z-50">
+                  </button>
+                  <div className="absolute right-0 top-10 bg-white border border-[#EDE4D8] rounded-xl shadow-md py-2 min-w-40 hidden group-hover:block z-50">
+                    <div className="px-4 py-2 border-b border-[#F5F0EA] mb-1">
+                      <p className="text-xs font-semibold text-[#1a1a1a]">
+                        {session?.user?.name || wallet?.email?.split("@")[0]}
+                      </p>
+                      <p className="text-xs text-[#9a9a9a]">
+                        {session?.user?.email || wallet?.email}
+                      </p>
+                    </div>
                     <Link href="/perfil"
                       className="block px-4 py-2 text-xs text-[#3d3d3d] hover:bg-[#F5F0EA]">
                       Mi perfil
@@ -68,9 +87,9 @@ export default function Navbar() {
                       className="block px-4 py-2 text-xs text-[#3d3d3d] hover:bg-[#F5F0EA]">
                       Mis tokens
                     </Link>
-                    <button onClick={() => disconnect()}
+                    <button onClick={handleDesconectar}
                       className="w-full text-left px-4 py-2 text-xs text-[#C4522A] hover:bg-[#FDF5F2]">
-                      Desconectar
+                      Cerrar sesion
                     </button>
                   </div>
                 </div>
@@ -100,10 +119,10 @@ export default function Navbar() {
                 {item.label}
               </Link>
             ))}
-            {wallet ? (
-              <button onClick={() => disconnect()}
+            {estaLogueado ? (
+              <button onClick={handleDesconectar}
                 className="text-sm text-[#C4522A] text-left">
-                Desconectar wallet
+                Cerrar sesion
               </button>
             ) : (
               <button onClick={() => { setMenuOpen(false); setModalOpen(true); }}

@@ -1,57 +1,61 @@
+"use client";
+import { useState, useEffect, useCallback } from "react";
 import CreatePost from "@/components/feed/CreatePost";
 import PostCard from "@/components/feed/PostCard";
 import Sidebar from "@/components/feed/Sidebar";
 
-const posts = [
-  {
-    id: 1,
-    autor: "Mariana López",
-    handle: "@mariana.rizos",
-    avatar: "M",
-    tiempo: "hace 5 min",
-    contenido: "¡Por fin encontré la rutina perfecta para mis rizos 3B! Llevo 3 semanas con el método CGM y los resultados son increíbles 🌀 Les comparto mis productos favoritos abajo 👇",
-    imagen: "🌀",
-    likes: 42,
-    comentarios: 8,
-    tipo: "rizada" as const,
-  },
-  {
-    id: 2,
-    autor: "Rizos con Valeria",
-    handle: "@valeria.rizos",
-    avatar: "V",
-    tiempo: "hace 23 min",
-    contenido: "Tip del día: nunca cepilles el cabello rizado en seco. Siempre hazlo con acondicionador y desde las puntas hacia las raíces. Tu rizo te lo agradecerá ✨",
-    likes: 128,
-    comentarios: 24,
-    tipo: "estilista" as const,
-  },
-  {
-    id: 3,
-    autor: "CurlsMX",
-    handle: "@curlsmx",
-    avatar: "C",
-    tiempo: "hace 1 hora",
-    contenido: "Presentamos nuestra nueva línea de geles sin alcohol para rizos 3A-4C. Formulados especialmente para el clima de México 🇲🇽 Disponibles en nuestra tienda RIZO.",
-    imagen: "✨",
-    likes: 89,
-    comentarios: 15,
-    tipo: "marca" as const,
-  },
-  {
-    id: 4,
-    autor: "Sofía Ondas",
-    handle: "@sofia.ondas",
-    avatar: "S",
-    tiempo: "hace 2 horas",
-    contenido: "Pregunta para la comunidad: ¿cuál es su producto favorito para definir rizos en días de humedad? El mío es el gel de linaza casero pero quiero probar algo nuevo 💭",
-    likes: 67,
-    comentarios: 31,
-    tipo: "rizada" as const,
-  },
-];
+type Post = {
+  id: string;
+  content: string;
+  imageUrl?: string;
+  likes: number;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    verified: boolean;
+  };
+};
+
+function getRol(role: string): "rizada" | "marca" | "estilista" {
+  if (role.toLowerCase() === "marca") return "marca";
+  if (role.toLowerCase() === "estilista") return "estilista";
+  return "rizada";
+}
+
+function formatTiempo(fecha: string): string {
+  const diff = Date.now() - new Date(fecha).getTime();
+  const mins = Math.floor(diff / 60000);
+  const horas = Math.floor(mins / 60);
+  const dias = Math.floor(horas / 24);
+  if (dias > 0) return `hace ${dias} dia${dias > 1 ? "s" : ""}`;
+  if (horas > 0) return `hace ${horas} hora${horas > 1 ? "s" : ""}`;
+  if (mins > 0) return `hace ${mins} min`;
+  return "ahora";
+}
 
 export default function ComunidadPage() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const cargarPosts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/posts");
+      const data = await res.json();
+      setPosts(data.posts || []);
+    } catch (error) {
+      console.error("Error cargando posts:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarPosts();
+  }, [cargarPosts]);
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -62,9 +66,46 @@ export default function ComunidadPage() {
             style={{ fontFamily: "var(--font-playfair)" }}>
             Comunidad
           </h1>
-          <CreatePost />
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} />
+          <CreatePost onPostCreado={cargarPosts} />
+
+          {loading && (
+            <div className="flex flex-col gap-4">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-white rounded-2xl p-5 border border-[#EDE4D8] animate-pulse">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-[#EDE4D8]"></div>
+                    <div className="flex-1">
+                      <div className="h-3 bg-[#EDE4D8] rounded w-32 mb-2"></div>
+                      <div className="h-2 bg-[#EDE4D8] rounded w-24"></div>
+                    </div>
+                  </div>
+                  <div className="h-3 bg-[#EDE4D8] rounded w-full mb-2"></div>
+                  <div className="h-3 bg-[#EDE4D8] rounded w-3/4"></div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && posts.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-[#EDE4D8]">
+              <span className="text-4xl mb-4">🌀</span>
+              <p className="text-sm font-semibold text-[#1a1a1a]">No hay publicaciones aun</p>
+              <p className="text-xs text-[#9a9a9a] mt-1">Se la primera en compartir algo</p>
+            </div>
+          )}
+
+          {!loading && posts.length > 0 && posts.map((post) => (
+            <PostCard key={post.id} post={{
+              id: post.id as any,
+              autor: post.user.name || "Usuario",
+              handle: `@${post.user.email.split("@")[0]}`,
+              avatar: post.user.name?.[0]?.toUpperCase() ?? "U",
+              tiempo: formatTiempo(post.createdAt),
+              contenido: post.content,
+              likes: post.likes,
+              comentarios: 0,
+              tipo: getRol(post.user.role),
+            }} />
           ))}
         </div>
 

@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+"use client";
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
-import Providers from "./providers";
+import { SessionProvider } from "next-auth/react";
+import { AcceslyProvider } from "accesly";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -15,11 +16,6 @@ const inter = Inter({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "RIZO — Tu rizo, tu poder, tu comunidad",
-  description: "La red social para cabello rizado",
-};
-
 export default function RootLayout({
   children,
 }: {
@@ -28,7 +24,11 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${playfair.variable} ${inter.variable}`}>
       <body className="min-h-full flex flex-col bg-[#F5F0EA]">
-        <Providers>{children}</Providers>
+        <AcceslyProvider appId={process.env.NEXT_PUBLIC_ACCESLY_APP_ID!}>
+          <SessionProvider>
+            {children}
+          </SessionProvider>
+        </AcceslyProvider>
       </body>
     </html>
   );

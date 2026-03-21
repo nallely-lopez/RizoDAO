@@ -1,4 +1,6 @@
+"use client";
 import Navbar from "@/components/layout/Navbar";
+import { SessionProvider } from "next-auth/react";
 
 export default function MainLayout({
   children,
@@ -6,9 +8,11 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#F5F0EA]">
-      <Navbar />
-      {children}
-    </div>
+    <SessionProvider>
+      <div className="min-h-screen bg-[#F5F0EA]">
+        <Navbar />
+        {children}
+      </div>
+    </SessionProvider>
   );
 }
