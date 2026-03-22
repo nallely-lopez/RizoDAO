@@ -3,8 +3,6 @@
 > Beauty meets Web3. Shop, connect with professionals, and earn 
 > on-chain loyalty tokens — powered by Stellar Network, invisibly.
 
-![RIZO Banner](public/banner.png)
-
 ---
 
 ## 🌟 What is RIZO?
