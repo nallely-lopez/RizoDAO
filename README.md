@@ -212,9 +212,9 @@ User sees: "+85 RIZO tokens earned!" 🎉
 
 ## 🔗 Links
 
-- 🎥 **Demo Video**: [YouTube]([https://youtube.com](https://youtu.be/gOCZK7X_2pg?si=pehD1Y7r5IrufIxL))
+- 🎥 **Demo Video**: [YouTube](https://youtu.be/gOCZK7X_2pg?si=pehD1Y7r5IrufIxL)
 - 📊 **DoraHacks**: [BUIDL Page](https://dorahacks.io)
-- 🌟 **Stellar Expert**: [View Transactions](https://stellar.expert/explorer/testnet)
+- 🌟 **Stellar Expert**: [View Transactions](https://stellar.expert/explorer/testnet/account/GD6KTSYJYBEJ4IFN42RPTYLHZGZLLA5YTYGOA4VREFSUBRUHX6M2AJ46)
 
 ---
 
