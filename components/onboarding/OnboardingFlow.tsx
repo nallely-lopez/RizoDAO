@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccesly } from "accesly";
+import { useSession } from "next-auth/react";
 
 const tiposCabello = [
   { id: "2a", titulo: "2A — Ondulado suave", desc: "Ondas ligeras en forma de S, cabello fino" },
@@ -23,6 +24,8 @@ const roles = [
 export default function OnboardingFlow() {
   const router = useRouter();
   const { wallet } = useAccesly();
+  const { data: session, status } = useSession();
+  const userEmail = wallet?.email || session?.user?.email || null;
   const [paso, setPaso] = useState(1);
   const [rol, setRol] = useState("");
   const [tipoCabello, setTipoCabello] = useState("");
@@ -56,26 +59,36 @@ export default function OnboardingFlow() {
     !nombre;
 
   const handleEmpezar = async () => {
-    if (!nombre || !wallet?.email) return;
+    // Obtener identidad: email de sesión, wallet, o userId de localStorage
+    const email = userEmail;
+    const userId = typeof window !== "undefined" ? localStorage.getItem("rizoUserId") : null;
+
+    console.log("[Onboarding] submit →", { email, userId, sessionStatus: status, nombre, rol, tipoCabello });
+
+    if (!nombre.trim()) return;
+    if (!email && !userId) {
+      console.warn("[Onboarding] Sin identidad de usuario — redirigiendo de todas formas");
+      router.push("/comunidad");
+      return;
+    }
+
     setGuardando(true);
 
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (email)  headers["x-user-email"] = email;
+    if (userId) headers["x-user-id"]    = userId;
+
     try {
-      await fetch("/api/user/update", {
+      const res = await fetch("/api/user/update", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-email": wallet.email,
-        },
-        body: JSON.stringify({
-          nombre,
-          bio,
-          rol,
-          tipoCabello,
-        }),
+        headers,
+        body: JSON.stringify({ nombre, bio, rol, tipoCabello }),
       });
+      const data = await res.json().catch(() => ({}));
+      console.log("[Onboarding] respuesta API →", res.status, data);
       router.push("/comunidad");
     } catch (error) {
-      console.error("Error al guardar perfil:", error);
+      console.error("[Onboarding] error de red:", error);
       router.push("/comunidad");
     } finally {
       setGuardando(false);
@@ -83,13 +96,13 @@ export default function OnboardingFlow() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F0EA] flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center px-4 py-12">
       <div className="flex items-center gap-2 mb-8">
-        <span className="text-[#C4522A] text-xl">o</span>
-        <span className="text-2xl font-bold text-[#1a1a1a]" style={{ fontFamily: "var(--font-playfair)" }}>RIZO</span>
+        <span className="text-[#8D6E63] text-xl">o</span>
+        <span className="text-2xl font-bold text-[#3E2723]" style={{ fontFamily: "var(--font-playfair)" }}>RIZO</span>
       </div>
 
-      <div className="w-full max-w-2xl bg-white rounded-3xl p-8 border border-[#EDE4D8] shadow-sm">
+      <div className="w-full max-w-2xl bg-white rounded-3xl p-8 border border-[#D7CCC8] shadow-sm">
 
         <div className="flex items-center gap-2 mb-8">
           {Array.from({ length: totalPasos }).map((_, i) => {
@@ -98,12 +111,12 @@ export default function OnboardingFlow() {
             return (
               <div key={n} className="flex items-center gap-2 flex-1">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{ backgroundColor: activo ? "#C4522A" : "#F5F0EA", color: activo ? "white" : "#9a9a9a" }}>
+                  style={{ backgroundColor: activo ? "#8D6E63" : "#FAF8F5", color: activo ? "white" : "#A1887F" }}>
                   {pasoActual > n ? "v" : n}
                 </div>
                 {n < totalPasos && (
                   <div className="flex-1 h-0.5 rounded-full"
-                    style={{ backgroundColor: pasoActual > n ? "#C4522A" : "#EDE4D8" }}>
+                    style={{ backgroundColor: pasoActual > n ? "#8D6E63" : "#D7CCC8" }}>
                   </div>
                 )}
               </div>
@@ -113,24 +126,24 @@ export default function OnboardingFlow() {
 
         {paso === 1 && (
           <>
-            <h1 className="text-2xl font-bold text-[#1a1a1a] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
+            <h1 className="text-2xl font-bold text-[#3E2723] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
               Como quieres usar RIZO?
             </h1>
-            <p className="text-sm text-[#9a9a9a] mb-6">Paso 1 de {totalPasos || 2}</p>
+            <p className="text-sm text-[#A1887F] mb-6">Paso 1 de {totalPasos || 2}</p>
             <div className="flex flex-col gap-3">
               {roles.map((r) => (
                 <button key={r.id} onClick={() => setRol(r.id)}
                   className="flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all"
-                  style={{ borderColor: rol === r.id ? "#C4522A" : "#EDE4D8", backgroundColor: rol === r.id ? "#FDF5F2" : "white" }}>
+                  style={{ borderColor: rol === r.id ? "#8D6E63" : "#D7CCC8", backgroundColor: rol === r.id ? "#EFEBE9" : "white" }}>
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
                     style={{ backgroundColor: r.color }}>
                     {r.id === "rizada" ? "R" : r.id === "marca" ? "M" : "E"}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-[#1a1a1a]">{r.titulo}</p>
-                    <p className="text-xs text-[#9a9a9a] mt-1">{r.desc}</p>
+                    <p className="text-sm font-bold text-[#3E2723]">{r.titulo}</p>
+                    <p className="text-xs text-[#A1887F] mt-1">{r.desc}</p>
                   </div>
-                  {rol === r.id && <span className="ml-auto text-[#C4522A] text-lg font-bold">v</span>}
+                  {rol === r.id && <span className="ml-auto text-[#8D6E63] text-lg font-bold">v</span>}
                 </button>
               ))}
             </div>
@@ -139,21 +152,21 @@ export default function OnboardingFlow() {
 
         {paso === 2 && rol === "rizada" && (
           <>
-            <h1 className="text-2xl font-bold text-[#1a1a1a] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
+            <h1 className="text-2xl font-bold text-[#3E2723] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
               Cual es tu tipo de cabello?
             </h1>
-            <p className="text-sm text-[#9a9a9a] mb-4">Paso 2 de 3</p>
-            <div className="w-full rounded-2xl overflow-hidden mb-6 border border-[#EDE4D8]">
+            <p className="text-sm text-[#A1887F] mb-4">Paso 2 de 3</p>
+            <div className="w-full rounded-2xl overflow-hidden mb-6 border border-[#D7CCC8]">
               <img src="/TipoRizo.jpeg" alt="Tipos de rizo" className="w-full object-cover" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               {tiposCabello.map((tipo) => (
                 <button key={tipo.id} onClick={() => setTipoCabello(tipo.id)}
                   className="flex items-start gap-3 p-4 rounded-2xl border-2 text-left transition-all"
-                  style={{ borderColor: tipoCabello === tipo.id ? "#C4522A" : "#EDE4D8", backgroundColor: tipoCabello === tipo.id ? "#FDF5F2" : "white" }}>
+                  style={{ borderColor: tipoCabello === tipo.id ? "#8D6E63" : "#D7CCC8", backgroundColor: tipoCabello === tipo.id ? "#EFEBE9" : "white" }}>
                   <div>
-                    <p className="text-xs font-semibold text-[#1a1a1a]">{tipo.titulo}</p>
-                    <p className="text-xs text-[#9a9a9a] mt-0.5">{tipo.desc}</p>
+                    <p className="text-xs font-semibold text-[#3E2723]">{tipo.titulo}</p>
+                    <p className="text-xs text-[#A1887F] mt-0.5">{tipo.desc}</p>
                   </div>
                 </button>
               ))}
@@ -163,27 +176,27 @@ export default function OnboardingFlow() {
 
         {paso === 3 && (
           <>
-            <h1 className="text-2xl font-bold text-[#1a1a1a] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
+            <h1 className="text-2xl font-bold text-[#3E2723] mb-2" style={{ fontFamily: "var(--font-playfair)" }}>
               Cuentanos sobre ti
             </h1>
-            <p className="text-sm text-[#9a9a9a] mb-6">Paso {totalPasos} de {totalPasos}</p>
+            <p className="text-sm text-[#A1887F] mb-6">Paso {totalPasos} de {totalPasos}</p>
             <div className="flex flex-col gap-4">
               <div className="flex justify-center mb-2">
-                <div className="w-20 h-20 rounded-full bg-[#EDE4D8] flex items-center justify-center cursor-pointer hover:bg-[#DDD0BC] transition-colors">
-                  <span className="text-sm text-[#9a9a9a]">foto</span>
+                <div className="w-20 h-20 rounded-full bg-[#D7CCC8] flex items-center justify-center cursor-pointer hover:bg-[#D7CCC8] transition-colors">
+                  <span className="text-sm text-[#A1887F]">foto</span>
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#5a5a5a]">Nombre o apodo</label>
+                <label className="text-xs font-medium text-[#6D4C41]">Nombre o apodo</label>
                 <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
                   placeholder="Como te llamas?"
-                  className="w-full bg-[#F5F0EA] border border-[#EDE4D8] rounded-xl px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#b0a89a] focus:outline-none focus:border-[#C4522A] transition-colors" />
+                  className="w-full bg-[#FAF8F5] border border-[#D7CCC8] rounded-xl px-4 py-3 text-sm text-[#3E2723] placeholder-[#BCAAA4] focus:outline-none focus:border-[#8D6E63] transition-colors" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#5a5a5a]">Bio corta</label>
+                <label className="text-xs font-medium text-[#6D4C41]">Bio corta</label>
                 <textarea value={bio} onChange={(e) => setBio(e.target.value)}
                   placeholder="Cuentanos sobre tu cabello..." rows={3}
-                  className="w-full bg-[#F5F0EA] border border-[#EDE4D8] rounded-xl px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#b0a89a] focus:outline-none focus:border-[#C4522A] resize-none transition-colors" />
+                  className="w-full bg-[#FAF8F5] border border-[#D7CCC8] rounded-xl px-4 py-3 text-sm text-[#3E2723] placeholder-[#BCAAA4] focus:outline-none focus:border-[#8D6E63] resize-none transition-colors" />
               </div>
             </div>
           </>
@@ -191,19 +204,19 @@ export default function OnboardingFlow() {
 
         <div className="flex items-center justify-between mt-8">
           {paso > 1 ? (
-            <button onClick={handleAtras} className="text-sm text-[#9a9a9a] hover:text-[#C4522A] transition-colors">
+            <button onClick={handleAtras} className="text-sm text-[#A1887F] hover:text-[#8D6E63] transition-colors">
               Atras
             </button>
           ) : <div />}
 
           {paso < 3 ? (
             <button onClick={handleContinuar} disabled={continuarDeshabilitado}
-              className="bg-[#C4522A] text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-[#A03E1E] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              className="bg-[#8D6E63] text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-[#6D4C41] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               Continuar
             </button>
           ) : (
-            <button onClick={handleEmpezar} disabled={!nombre || guardando}
-              className="bg-[#C4522A] text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-[#A03E1E] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <button onClick={handleEmpezar} disabled={!nombre.trim() || guardando}
+              className="bg-[#8D6E63] text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-[#6D4C41] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               {guardando ? "Guardando..." : "Empezar"}
             </button>
           )}

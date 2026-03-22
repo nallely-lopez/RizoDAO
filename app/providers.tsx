@@ -10,7 +10,6 @@ function AuthHandler({ children }: { children: React.ReactNode }) {
   const prevWallet = useRef<any>(null);
 
   useEffect(() => {
-    // Solo actuar cuando wallet cambia de null a objeto (momento de conexión)
     const wasNull = prevWallet.current === null;
     const isNowConnected = wallet !== null && wallet !== undefined;
 
@@ -36,7 +35,7 @@ function AuthHandler({ children }: { children: React.ReactNode }) {
             router.push("/comunidad");
           }
         })
-        .catch((err) => console.error("error:", err));
+        .catch((err) => console.error("wallet auth error:", err));
     }
 
     prevWallet.current = wallet ?? null;

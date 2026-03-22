@@ -2,7 +2,7 @@ const features = [
   {
     icon: "🛍️",
     bg: "#FBEAF2",
-    iconColor: "#C4522A",
+    iconColor: "#8D6E63",
     title: "Tienda curada",
     desc: "Productos seleccionados por expertos para cada tipo de rizo. Las marcas pueden crear su perfil y vender directamente.",
   },
@@ -31,16 +31,16 @@ const features = [
 
 export default function Features() {
   return (
-    <section className="w-full bg-[#F5F0EA] py-20">
+    <section className="w-full bg-[#FAF8F5] py-20">
       <div className="max-w-6xl mx-auto px-6">
 
         {/* Header */}
         <div className="text-center mb-12">
-          <p className="text-xs font-semibold tracking-widest text-[#C4522A] uppercase mb-3">
+          <p className="text-xs font-semibold tracking-widest text-[#8D6E63] uppercase mb-3">
             Todo en un solo lugar
           </p>
           <h2
-            className="text-3xl md:text-5xl font-bold text-[#1a1a1a]"
+            className="text-3xl md:text-5xl font-bold text-[#3E2723]"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
             Un ecosistema hecho para ti
@@ -61,12 +61,12 @@ export default function Features() {
                 {f.icon}
               </div>
               <h3
-                className="text-xl font-bold text-[#1a1a1a]"
+                className="text-xl font-bold text-[#3E2723]"
                 style={{ fontFamily: "var(--font-playfair)" }}
               >
                 {f.title}
               </h3>
-              <p className="text-sm text-[#5a5a5a] leading-relaxed">{f.desc}</p>
+              <p className="text-sm text-[#6D4C41] leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>

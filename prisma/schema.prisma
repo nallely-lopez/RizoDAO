@@ -28,6 +28,19 @@ model User {
   tokenTxs     TokenTransaction[]
   appointments Appointment[]
   reviews      Review[]
+  purchases    Purchase[]
+}
+
+model Purchase {
+  id            String   @id @default(cuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  walletAddress String?
+  productName   String
+  precioUSDC    Float
+  tokensGanados Int
+  stellarTxHash String
+  createdAt     DateTime @default(now())
 }
 
 model Post {

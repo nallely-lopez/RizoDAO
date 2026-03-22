@@ -1,82 +1,325 @@
 "use client";
-import { useState } from "react";
-import ProductCard from "@/components/shop/ProductCard";
-import FiltrosTienda from "@/components/shop/FiltrosTienda";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useAccesly } from "accesly";
+import { Search, TrendingUp, Sparkles } from "lucide-react";
 
-const productos = [
-  { id: 1, nombre: "Gel Definidor Fuerte", marca: "CurlsMX", precio: 189, calificacion: 5, resenas: 48, tipo: "marca" as const, categoria: "Gel", tipoRizo: ["3A", "3B", "3C"], color: "#E8F5EE" },
-  { id: 2, nombre: "Shampoo Sin Sulfatos", marca: "CurlsMX", precio: 220, calificacion: 4, resenas: 32, tipo: "marca" as const, categoria: "Shampoo", tipoRizo: ["2A", "2B", "3A"], color: "#EEEDFE" },
-  { id: 3, nombre: "Mascarilla Hidratante", marca: "Rizos con Valeria", precio: 310, calificacion: 5, resenas: 67, tipo: "estilista" as const, categoria: "Mascarilla", tipoRizo: ["3B", "3C", "4A"], color: "#FBEAF2" },
-  { id: 4, nombre: "Aceite de Argán Puro", marca: "CurlsMX", precio: 275, calificacion: 4, resenas: 21, tipo: "marca" as const, categoria: "Aceite", tipoRizo: ["4A", "4B", "4C"], color: "#FAEEDA" },
-  { id: 5, nombre: "Crema para Peinar", marca: "Rizos con Valeria", precio: 195, calificacion: 5, resenas: 89, tipo: "estilista" as const, categoria: "Crema", tipoRizo: ["2B", "3A", "3B"], color: "#E1F5EE" },
-  { id: 6, nombre: "Acondicionador Profundo", marca: "CurlsMX", precio: 240, calificacion: 4, resenas: 15, tipo: "marca" as const, categoria: "Acondicionador", tipoRizo: ["2A", "2B"], color: "#FAECE7" },
-];
+const NEXT_MILESTONE = 500;
+// Tipo de conversión aproximado: 1 USDC ≈ 19 MXN
+const MXN_PER_USDC = 19;
+
+// Tipo que usa el checkout
+type ProductoCheckout = {
+  id: string;
+  nombre: string;
+  marca: string;
+  precioMXN: number;
+  precioUSDC: number;
+  imagen: string;
+  tokens: number;
+};
+
+// Tipo que devuelve /api/products (modelo Prisma)
+type ProductoDB = {
+  id: string;
+  name: string;
+  brandName: string;
+  price: number;
+  tokenPrice: number;
+  imageUrl: string | null;
+  category: string | null;
+  votes: number;
+};
+
+function dbToUI(p: ProductoDB): ProductoCheckout & { tendencia: boolean; votes: number } {
+  return {
+    id: p.id,
+    nombre: p.name,
+    marca: p.brandName,
+    precioUSDC: p.price,
+    precioMXN: Math.round(p.price * MXN_PER_USDC),
+    imagen: p.imageUrl ?? "",
+    tokens: p.tokenPrice,
+    votes: p.votes,
+    tendencia: false, // se calcula después de ordenar
+  };
+}
+
+function TarjetaProducto({
+  producto,
+  onClick,
+}: {
+  producto: ProductoCheckout;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white rounded-2xl overflow-hidden border border-[#D7CCC8] shadow-sm hover:shadow-md transition-all cursor-pointer group"
+    >
+      <div className="aspect-square bg-[#EFEBE9] overflow-hidden">
+        <img
+          src={producto.imagen}
+          alt={producto.nombre}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src =
+              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' fill='%23EFEBE9'%3E%3Crect width='200' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='40'%3E%F0%9F%A7%B4%3C/text%3E%3C/svg%3E";
+          }}
+        />
+      </div>
+      <div className="p-4 space-y-2">
+        <div>
+          <p className="text-xs text-[#A1887F]">{producto.marca}</p>
+          <h4
+            className="text-sm font-semibold text-[#3E2723] leading-snug line-clamp-2 mt-0.5"
+            style={{ fontFamily: "var(--font-playfair)" }}
+          >
+            {producto.nombre}
+          </h4>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold text-[#8D6E63]">${producto.precioUSDC} USDC</span>
+          <span className="text-xs text-[#A1887F]">(${producto.precioMXN} MXN)</span>
+        </div>
+        <div className="inline-flex items-center gap-1 bg-[#EFEBE9] text-[#6D4C41] text-xs font-medium px-2.5 py-1 rounded-full">
+          🪙 +{producto.tokens} tokens
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function TiendaPage() {
-  const [categoriaActiva, setCategoriaActiva] = useState("Todos");
-  const [tipoRizoActivo, setTipoRizoActivo] = useState("Todos");
+  const [busqueda, setBusqueda] = useState("");
+  const [productos, setProductos] = useState<(ProductoCheckout & { tendencia: boolean; votes: number })[]>([]);
+  const [loadingProductos, setLoadingProductos] = useState(true);
+  const [tokens, setTokens] = useState<number | null>(null);
+  const router = useRouter();
+  const { data: session } = useSession();
+  const { wallet } = useAccesly();
 
-  const productosFiltrados = productos.filter((p) => {
-    const porCategoria = categoriaActiva === "Todos" || p.categoria === categoriaActiva;
-    const porTipo = tipoRizoActivo === "Todos" || p.tipoRizo.includes(tipoRizoActivo);
-    return porCategoria && porTipo;
-  });
+  const userEmail = session?.user?.email || wallet?.email;
+
+  // Cargar productos desde la BD
+  useEffect(() => {
+    fetch("/api/products")
+      .then((r) => r.json())
+      .then((data: ProductoDB[]) => {
+        const mapped = data.map(dbToUI);
+        // Los 3 con más votos son "tendencia"
+        const sorted = [...mapped].sort((a, b) => b.votes - a.votes);
+        const topIds = new Set(sorted.slice(0, 3).map((p) => p.id));
+        setProductos(mapped.map((p) => ({ ...p, tendencia: topIds.has(p.id) })));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingProductos(false));
+  }, []);
+
+  // Cargar tokens del usuario
+  useEffect(() => {
+    if (!userEmail) return;
+    fetch(`/api/user/me?email=${encodeURIComponent(userEmail)}`)
+      .then((r) => r.json())
+      .then((data) => { if (typeof data.tokens === "number") setTokens(data.tokens); })
+      .catch(() => {});
+  }, [userEmail]);
+
+  const filtrados = productos.filter((p) =>
+    p.nombre.toLowerCase().includes(busqueda.toLowerCase())
+  );
+  const tendencias = productos.filter((p) => p.tendencia);
+
+  const handleProductoClick = (producto: ProductoCheckout) => {
+    sessionStorage.setItem("productoSeleccionado", JSON.stringify(producto));
+    router.push("/checkout");
+  };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="min-h-screen bg-[#FAF8F5]">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#1a1a1a]"
-          style={{ fontFamily: "var(--font-playfair)" }}>
-          Tienda
-        </h1>
-        <p className="text-sm text-[#9a9a9a] mt-1">
-          Productos seleccionados para tu tipo de rizo
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-        {/* Filtros */}
-        <div className="lg:col-span-1">
-          <FiltrosTienda
-            categoriaActiva={categoriaActiva}
-            setCategoriaActiva={setCategoriaActiva}
-            tipoRizoActivo={tipoRizoActivo}
-            setTipoRizoActivo={setTipoRizoActivo}
-          />
+        {/* Header */}
+        <div className="mb-6">
+          <h1
+            className="text-2xl md:text-3xl font-bold text-[#3E2723] mb-1"
+            style={{ fontFamily: "var(--font-playfair)" }}
+          >
+            Tienda
+          </h1>
+          <p className="text-[#A1887F] mb-5">
+            Productos de Rizos Mexicanos recomendados por la comunidad
+          </p>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A1887F]" />
+            <input
+              type="text"
+              placeholder="Buscar productos..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#D7CCC8] bg-white text-sm text-[#3E2723] placeholder:text-[#BCAAA4] focus:outline-none focus:ring-2 focus:ring-[#8D6E63]/20 focus:border-[#8D6E63] transition-colors"
+            />
+          </div>
         </div>
 
-        {/* Productos */}
-        <div className="lg:col-span-3">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-[#9a9a9a]">
-              {productosFiltrados.length} productos encontrados
-            </p>
-            <select className="text-sm bg-white border border-[#EDE4D8] rounded-xl px-3 py-2 text-[#5a5a5a] focus:outline-none focus:border-[#C4522A]">
-              <option>Mas valorados</option>
-              <option>Precio: menor a mayor</option>
-              <option>Precio: mayor a menor</option>
-              <option>Mas recientes</option>
-            </select>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          {/* Contenido principal */}
+          <div className="lg:col-span-9 space-y-6">
+
+            {/* Banner USDC */}
+            <div className="bg-gradient-to-r from-[#8D6E63] to-[#BCAAA4] text-white px-6 py-6 rounded-2xl">
+              <div className="flex items-center gap-3 mb-2">
+                <Sparkles className="w-6 h-6" />
+                <h3
+                  className="text-lg font-semibold"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  Paga con USDC y gana recompensas
+                </h3>
+              </div>
+              <p className="text-sm opacity-90">
+                Cada compra te da tokens RIZO que puedes canjear por descuentos.
+                Pagos instantáneos en Stellar Network.
+              </p>
+            </div>
+
+            {/* Skeleton de carga */}
+            {loadingProductos && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="bg-white rounded-2xl border border-[#D7CCC8] animate-pulse">
+                    <div className="aspect-square bg-[#EFEBE9]" />
+                    <div className="p-4 space-y-2">
+                      <div className="h-3 bg-[#EFEBE9] rounded w-20" />
+                      <div className="h-4 bg-[#EFEBE9] rounded w-full" />
+                      <div className="h-4 bg-[#EFEBE9] rounded w-2/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!loadingProductos && (
+              <>
+                {/* Tendencias */}
+                {!busqueda && tendencias.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="w-5 h-5 text-[#8D6E63]" />
+                      <h3
+                        className="text-lg font-semibold text-[#3E2723]"
+                        style={{ fontFamily: "var(--font-playfair)" }}
+                      >
+                        Tendencias de la comunidad
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {tendencias.map((p) => (
+                        <div key={p.id} className="relative">
+                          <span className="absolute top-3 left-3 z-10 bg-[#8D6E63] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                            Tendencia 🔥
+                          </span>
+                          <TarjetaProducto producto={p} onClick={() => handleProductoClick(p)} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Todos los productos */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3
+                      className="text-lg font-semibold text-[#3E2723]"
+                      style={{ fontFamily: "var(--font-playfair)" }}
+                    >
+                      {busqueda ? "Resultados de búsqueda" : "Todos los productos"}
+                    </h3>
+                    <p className="text-sm text-[#A1887F]">
+                      {filtrados.length} {filtrados.length === 1 ? "producto" : "productos"}
+                    </p>
+                  </div>
+
+                  {filtrados.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {filtrados.map((p) => (
+                        <TarjetaProducto key={p.id} producto={p} onClick={() => handleProductoClick(p)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                      <span className="text-4xl mb-3">🔍</span>
+                      <p className="text-sm font-semibold text-[#3E2723]">Sin resultados</p>
+                      <p className="text-xs text-[#A1887F] mt-1">Intenta con otro término</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
-          {productosFiltrados.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {productosFiltrados.map((producto) => (
-                <ProductCard key={producto.id} producto={producto} />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <span className="text-4xl mb-4">🔍</span>
-              <p className="text-sm font-semibold text-[#1a1a1a]">No hay productos</p>
-              <p className="text-xs text-[#9a9a9a] mt-1">Intenta con otro filtro</p>
-            </div>
-          )}
-        </div>
+          {/* Sidebar */}
+          <div className="hidden lg:block lg:col-span-3 space-y-4">
 
+            {/* Marca destacada */}
+            <div className="bg-white rounded-2xl border border-[#D7CCC8] p-5">
+              <h3
+                className="text-base font-semibold text-[#3E2723] mb-4"
+                style={{ fontFamily: "var(--font-playfair)" }}
+              >
+                Marca destacada
+              </h3>
+              <div className="flex flex-col gap-2">
+                <div className="w-full px-4 py-3 bg-[#FAF8F5] rounded-xl">
+                  <p className="text-sm font-medium text-[#3E2723]">Rizos Mexicanos</p>
+                  <p className="text-xs text-[#A1887F] mt-0.5">{productos.length} productos disponibles</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Tip */}
+            <div className="bg-gradient-to-br from-[#EFEBE9] to-[#D7CCC8] rounded-2xl p-5 border border-[#BCAAA4]">
+              <h4
+                className="text-sm font-semibold text-[#3E2723] mb-2"
+                style={{ fontFamily: "var(--font-playfair)" }}
+              >
+                💡 ¿Sabías que?
+              </h4>
+              <p className="text-xs text-[#6D4C41] leading-relaxed">
+                Cada compra apoya a una marca mexicana. Ganas tokens para descuentos futuros.
+              </p>
+            </div>
+
+            {/* Token balance */}
+            <div className="bg-white rounded-2xl border border-[#D7CCC8] p-5">
+              <p className="text-xs text-[#A1887F] mb-1">Mis tokens RIZO</p>
+              <div className="flex items-end gap-1.5">
+                <span
+                  className="text-3xl font-bold text-[#8D6E63]"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  {tokens !== null ? tokens : "—"}
+                </span>
+                <span className="text-xs text-[#A1887F] mb-1">tokens</span>
+              </div>
+              <div className="mt-3 h-1.5 rounded-full bg-[#EFEBE9] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[#8D6E63] transition-all duration-500"
+                  style={{ width: `${tokens !== null ? Math.min((tokens / NEXT_MILESTONE) * 100, 100) : 0}%` }}
+                />
+              </div>
+              <p className="text-xs text-[#A1887F] mt-1.5">
+                {tokens !== null
+                  ? tokens >= NEXT_MILESTONE
+                    ? "¡Listo para canjear un descuento!"
+                    : `${NEXT_MILESTONE - tokens} tokens para tu próximo descuento`
+                  : "Inicia sesión para ver tus tokens"}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

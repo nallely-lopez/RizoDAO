@@ -18,7 +18,7 @@ export default function ProductCard({ producto }: { producto: Producto }) {
   const [votado, setVotado] = useState<null | "bueno" | "malo">(null);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#EDE4D8] overflow-hidden hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-2xl border border-[#D7CCC8] overflow-hidden hover:shadow-md transition-shadow">
 
       {/* Imagen placeholder */}
       <div className="w-full h-44 flex items-center justify-center"
@@ -37,38 +37,38 @@ export default function ProductCard({ producto }: { producto: Producto }) {
             }}>
             {producto.tipo === "marca" ? "Marca verificada" : "Estilista verificado"}
           </span>
-          <span className="text-xs text-[#9a9a9a]">{producto.categoria}</span>
+          <span className="text-xs text-[#A1887F]">{producto.categoria}</span>
         </div>
 
         {/* Nombre y marca */}
         <div>
-          <p className="text-sm font-bold text-[#1a1a1a]">{producto.nombre}</p>
-          <p className="text-xs text-[#9a9a9a]">{producto.marca}</p>
+          <p className="text-sm font-bold text-[#3E2723]">{producto.nombre}</p>
+          <p className="text-xs text-[#A1887F]">{producto.marca}</p>
         </div>
 
         {/* Calificacion */}
         <div className="flex items-center gap-1">
           {[1,2,3,4,5].map((star) => (
             <span key={star} className="text-xs"
-              style={{ color: star <= producto.calificacion ? "#C89B4F" : "#EDE4D8" }}>
+              style={{ color: star <= producto.calificacion ? "#C89B4F" : "#D7CCC8" }}>
               ★
             </span>
           ))}
-          <span className="text-xs text-[#9a9a9a] ml-1">({producto.resenas})</span>
+          <span className="text-xs text-[#A1887F] ml-1">({producto.resenas})</span>
         </div>
 
         {/* Tipo de rizo */}
         <div className="flex flex-wrap gap-1">
           {producto.tipoRizo.map((tipo) => (
-            <span key={tipo} className="text-xs px-2 py-0.5 rounded-full bg-[#F5F0EA] text-[#5a5a5a]">
+            <span key={tipo} className="text-xs px-2 py-0.5 rounded-full bg-[#FAF8F5] text-[#6D4C41]">
               {tipo}
             </span>
           ))}
         </div>
 
         {/* Precio y acciones */}
-        <div className="flex items-center justify-between mt-1 pt-2 border-t border-[#F5F0EA]">
-          <span className="text-base font-bold text-[#1a1a1a]">${producto.precio} MXN</span>
+        <div className="flex items-center justify-between mt-1 pt-2 border-t border-[#FAF8F5]">
+          <span className="text-base font-bold text-[#3E2723]">${producto.precio} MXN</span>
           <div className="flex items-center gap-2">
             {!votado ? (
               <div className="flex items-center gap-1">
@@ -82,7 +82,7 @@ export default function ProductCard({ producto }: { producto: Producto }) {
                 </button>
               </div>
             ) : (
-              <span className="text-xs text-[#9a9a9a]">
+              <span className="text-xs text-[#A1887F]">
                 {votado === "bueno" ? "Marcado como bueno" : "Marcado como malo"}
               </span>
             )}

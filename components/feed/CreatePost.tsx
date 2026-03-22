@@ -14,8 +14,8 @@ export default function CreatePost({ onPostCreado }: Props) {
   const { data: session } = useSession();
 
   const userEmail = wallet?.email || session?.user?.email;
-  const userInicial = wallet?.email?.[0]?.toUpperCase() 
-    || session?.user?.name?.[0]?.toUpperCase() 
+  const userInicial = wallet?.email?.[0]?.toUpperCase()
+    || session?.user?.name?.[0]?.toUpperCase()
     || "R";
   const estaConectado = !!userEmail;
 
@@ -47,9 +47,9 @@ export default function CreatePost({ onPostCreado }: Props) {
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 flex flex-col gap-4 border border-[#EDE4D8]">
+    <div className="bg-white rounded-2xl p-5 flex flex-col gap-4 border border-[#D7CCC8]">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-[#EDE4D8] flex items-center justify-center text-lg font-bold text-[#C4522A]"
+        <div className="w-10 h-10 rounded-full bg-[#D7CCC8] flex items-center justify-center text-lg font-bold text-[#8D6E63]"
           style={{ fontFamily: "var(--font-playfair)" }}>
           {userInicial}
         </div>
@@ -59,26 +59,26 @@ export default function CreatePost({ onPostCreado }: Props) {
           placeholder={estaConectado ? "Que esta pasando con tu rizo hoy?" : "Conectate para publicar"}
           rows={2}
           disabled={!estaConectado}
-          className="flex-1 bg-[#F5F0EA] rounded-xl px-4 py-3 text-sm text-[#1a1a1a] placeholder-[#b0a89a] focus:outline-none focus:ring-1 focus:ring-[#C4522A] resize-none transition-colors disabled:opacity-50"
+          className="flex-1 bg-[#FAF8F5] rounded-xl px-4 py-3 text-sm text-[#3E2723] placeholder-[#BCAAA4] focus:outline-none focus:ring-1 focus:ring-[#8D6E63] resize-none transition-colors disabled:opacity-50"
         />
       </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-1.5 text-xs text-[#9a9a9a] hover:text-[#C4522A] transition-colors">
+          <button className="flex items-center gap-1.5 text-xs text-[#A1887F] hover:text-[#8D6E63] transition-colors">
             <span>📷</span> Foto
           </button>
-          <button className="flex items-center gap-1.5 text-xs text-[#9a9a9a] hover:text-[#C4522A] transition-colors">
+          <button className="flex items-center gap-1.5 text-xs text-[#A1887F] hover:text-[#8D6E63] transition-colors">
             <span>🎥</span> Video
           </button>
         </div>
         <div className="flex items-center gap-2">
           {texto.trim() && (
-            <span className="text-xs text-[#9a9a9a]">+5 tokens</span>
+            <span className="text-xs text-[#A1887F]">+5 tokens</span>
           )}
           <button
             onClick={handlePublicar}
             disabled={!texto.trim() || loading || !estaConectado}
-            className="bg-[#C4522A] text-white px-5 py-2 rounded-full text-xs font-medium hover:bg-[#A03E1E] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            className="bg-[#8D6E63] text-white px-5 py-2 rounded-full text-xs font-medium hover:bg-[#6D4C41] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             {loading ? "Publicando..." : "Publicar"}
           </button>
         </div>

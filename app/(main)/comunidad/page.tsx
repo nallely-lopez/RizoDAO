@@ -62,7 +62,7 @@ export default function ComunidadPage() {
 
         {/* Feed principal */}
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <h1 className="text-2xl font-bold text-[#1a1a1a]"
+          <h1 className="text-2xl font-bold text-[#3E2723]"
             style={{ fontFamily: "var(--font-playfair)" }}>
             Comunidad
           </h1>
@@ -71,26 +71,26 @@ export default function ComunidadPage() {
           {loading && (
             <div className="flex flex-col gap-4">
               {[1, 2, 3].map((n) => (
-                <div key={n} className="bg-white rounded-2xl p-5 border border-[#EDE4D8] animate-pulse">
+                <div key={n} className="bg-white rounded-2xl p-5 border border-[#D7CCC8] animate-pulse">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-[#EDE4D8]"></div>
+                    <div className="w-10 h-10 rounded-full bg-[#D7CCC8]"></div>
                     <div className="flex-1">
-                      <div className="h-3 bg-[#EDE4D8] rounded w-32 mb-2"></div>
-                      <div className="h-2 bg-[#EDE4D8] rounded w-24"></div>
+                      <div className="h-3 bg-[#D7CCC8] rounded w-32 mb-2"></div>
+                      <div className="h-2 bg-[#D7CCC8] rounded w-24"></div>
                     </div>
                   </div>
-                  <div className="h-3 bg-[#EDE4D8] rounded w-full mb-2"></div>
-                  <div className="h-3 bg-[#EDE4D8] rounded w-3/4"></div>
+                  <div className="h-3 bg-[#D7CCC8] rounded w-full mb-2"></div>
+                  <div className="h-3 bg-[#D7CCC8] rounded w-3/4"></div>
                 </div>
               ))}
             </div>
           )}
 
           {!loading && posts.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-[#EDE4D8]">
+            <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-[#D7CCC8]">
               <span className="text-4xl mb-4">🌀</span>
-              <p className="text-sm font-semibold text-[#1a1a1a]">No hay publicaciones aun</p>
-              <p className="text-xs text-[#9a9a9a] mt-1">Se la primera en compartir algo</p>
+              <p className="text-sm font-semibold text-[#3E2723]">No hay publicaciones aun</p>
+              <p className="text-xs text-[#A1887F] mt-1">Se la primera en compartir algo</p>
             </div>
           )}
 

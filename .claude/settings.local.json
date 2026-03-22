@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/lopez/rizo-app/app -type f -name *.tsx)",
+      "Bash(npm install:*)",
+      "Bash(xargs sed:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(npx prisma:*)",
+      "Bash(find C:Userslopezrizo-appappapi -type f -name *.ts)",
+      "Bash(find:*)",
+      "Bash(npm list:*)",
+      "Bash(npx next:*)",
+      "Bash(node -e \":*)",
+      "WebFetch(domain:rizosmexicanos.com)",
+      "WebFetch(domain:www.instagram.com)",
+      "WebSearch",
+      "WebFetch(domain:www.rizosmexicanos.com)",
+      "WebFetch(domain:rizosmexicanosmonterrey.com)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}

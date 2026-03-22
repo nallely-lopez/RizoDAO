@@ -9,7 +9,7 @@ export default function MainLayout({
 }) {
   return (
     <SessionProvider>
-      <div className="min-h-screen bg-[#F5F0EA]">
+      <div className="min-h-screen bg-[#FAF8F5]">
         <Navbar />
         {children}
       </div>

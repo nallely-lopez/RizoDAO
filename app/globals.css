@@ -1,6 +1,74 @@
 @import "tailwindcss";
 
+/* ── Curly Connect Design System ── */
+:root {
+  --font-size: 16px;
+
+  /* Colores base */
+  --background:           #FAF8F5;
+  --foreground:           #3E2723;
+  --card:                 #FFFFFF;
+  --card-foreground:      #3E2723;
+
+  /* Primario — café medio */
+  --primary:              #8D6E63;
+  --primary-foreground:   #FFFFFF;
+  --primary-hover:        #6D4C41;
+
+  /* Secundario — marrón claro */
+  --secondary:            #D7CCC8;
+  --secondary-foreground: #3E2723;
+
+  /* Muted — beige cálido */
+  --muted:                #EFEBE9;
+  --muted-foreground:     #6D4C41;
+
+  /* Accent */
+  --accent:               #BCAAA4;
+  --accent-foreground:    #3E2723;
+
+  /* Bordes */
+  --border:               #D7CCC8;
+
+  /* Inputs */
+  --input-bg:             #EFEBE9;
+  --placeholder:          #BCAAA4;
+
+  /* Radio de borde */
+  --radius:               1rem;
+}
+
+/* ── Base ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: var(--font-size);
+}
+
 body {
-  background-color: #F5F0EA;
-  color: #1a1a1a;
+  background-color: #FAF8F5;
+  color: #3E2723;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar sutil ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF8F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #D7CCC8;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #BCAAA4;
 }

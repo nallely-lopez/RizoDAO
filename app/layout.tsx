@@ -2,7 +2,7 @@
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
-import { AcceslyProvider } from "accesly";
+import Providers from "@/app/providers";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -23,12 +23,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${playfair.variable} ${inter.variable}`}>
-      <body className="min-h-full flex flex-col bg-[#F5F0EA]">
-        <AcceslyProvider appId={process.env.NEXT_PUBLIC_ACCESLY_APP_ID!}>
-          <SessionProvider>
+      <body className="min-h-full flex flex-col bg-[#FAF8F5]">
+        <SessionProvider>
+          <Providers>
             {children}
-          </SessionProvider>
-        </AcceslyProvider>
+          </Providers>
+        </SessionProvider>
       </body>
     </html>
   );
