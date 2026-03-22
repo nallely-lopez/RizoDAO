@@ -24,11 +24,12 @@ model User {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  posts        Post[]
-  tokenTxs     TokenTransaction[]
-  appointments Appointment[]
-  reviews      Review[]
-  purchases    Purchase[]
+  posts         Post[]
+  tokenTxs      TokenTransaction[]
+  appointments  Appointment[]
+  reviews       Review[]
+  purchases     Purchase[]
+  discountCodes DiscountCode[]
 }
 
 model Purchase {
@@ -90,6 +91,21 @@ model TokenTransaction {
   reason          String
   stellarTxHash   String?
   createdAt       DateTime @default(now())
+}
+
+model DiscountCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  description String
+  discount    Int
+  tokensUsed  Int
+  used        Boolean   @default(false)
+  usedAt      DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
 }
 
 model Appointment {

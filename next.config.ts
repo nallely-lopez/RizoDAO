@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    resolveAlias: {
+      buffer: "buffer/",
+      events: "events/",
+      stream: "stream-browserify",
+    },
+  },
   async headers() {
     return [
       {

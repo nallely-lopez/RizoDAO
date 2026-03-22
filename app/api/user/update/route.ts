@@ -17,9 +17,6 @@ export async function POST(req: NextRequest) {
       ? { email: userEmail }
       : { id: userId as string };
 
-    // Leer estado ANTES de actualizar para saber si hay que dar tokens
-    const userAntes = await prisma.user.findUnique({ where: whereClause });
-
     const roleNormalizado =
       rol?.toUpperCase() === "MARCA" ? "MARCA" :
       rol?.toUpperCase() === "ESTILISTA" ? "ESTILISTA" :
@@ -35,23 +32,6 @@ export async function POST(req: NextRequest) {
         onboardingCompleted: true,
       },
     });
-
-    // Dar tokens solo si es la primera vez que completa el onboarding
-    if (userAntes && !userAntes.onboardingCompleted) {
-      await prisma.user.update({
-        where: whereClause,
-        data: { tokens: { increment: 20 } },
-      });
-
-      await prisma.tokenTransaction.create({
-        data: {
-          userId: userAntes.id,
-          amount: 20,
-          type: "GANADO",
-          reason: "Welcome bonus",
-        },
-      });
-    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

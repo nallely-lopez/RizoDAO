@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import * as StellarSdk from "@stellar/stellar-sdk";
+import { decryptSecret } from "@/lib/encryption";
+import { registerPurchase } from "@/lib/loyaltyContract";
 
 const prisma = new PrismaClient();
 
@@ -11,7 +13,7 @@ const USDC = new StellarSdk.Asset("USDC", USDC_ISSUER);
 
 export async function POST(req: Request) {
   try {
-    const { userEmail, productName, precioUSDC, tokensGanados, paymentAsset = "USDC", precioXLM } =
+    const { userEmail, productName, precioUSDC, tokensGanados, paymentAsset = "USDC", precioXLM, discountCode } =
       await req.json();
 
     if (!userEmail || !productName) {
@@ -37,7 +39,7 @@ export async function POST(req: Request) {
     // Intentar pago real en Stellar Testnet si el usuario tiene secret key
     if (user.stellarSecretKey && user.stellarPublicKey) {
       try {
-        const keypair = StellarSdk.Keypair.fromSecret(user.stellarSecretKey);
+        const keypair = StellarSdk.Keypair.fromSecret(decryptSecret(user.stellarSecretKey));
         const account = await server.loadAccount(keypair.publicKey());
 
         const pagoAsset = paymentAsset === "XLM" ? StellarSdk.Asset.native() : USDC;
@@ -103,6 +105,21 @@ export async function POST(req: Request) {
         stellarTxHash: txHash,
       },
     });
+
+    // Registrar compra en contrato Soroban (fire-and-forget, no bloquea la respuesta)
+    if (user.stellarSecretKey && user.stellarPublicKey && process.env.LOYALTY_CONTRACT_ID) {
+      const decryptedSecret = decryptSecret(user.stellarSecretKey);
+      registerPurchase(decryptedSecret, tokensGanados * 10)
+        .catch((err) => console.error("[loyalty] register_purchase falló:", err));
+    }
+
+    // Invalidar código de descuento si fue usado en esta compra
+    if (discountCode) {
+      await prisma.discountCode.updateMany({
+        where: { code: discountCode, userId: user.id, used: false },
+        data: { used: true, usedAt: new Date() },
+      });
+    }
 
     return NextResponse.json({
       success: true,

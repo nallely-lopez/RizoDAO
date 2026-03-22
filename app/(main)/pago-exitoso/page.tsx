@@ -1,27 +1,34 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Zap, Gift, ExternalLink, Copy, Check } from "lucide-react";
+import { CheckCircle, Gift, ExternalLink } from "lucide-react";
 
 type ResultadoPago = {
   txHash: string;
   txOnChain: boolean;
   producto: string;
-  precioUSDC: number;
+  precioMXN: number;
+  precioOriginal?: number;
+  descuentoAplicado?: number;
   tokens: number;
 };
 
 const STELLAR_EXPERT_URL = "https://stellar.expert/explorer/testnet/tx";
+const CONTRACT_ID = process.env.NEXT_PUBLIC_LOYALTY_CONTRACT_ID ?? "";
 
 export default function PagoExitosoPage() {
   const router = useRouter();
   const [resultado, setResultado] = useState<ResultadoPago | null>(null);
-  const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("pagoExitoso");
     if (stored) {
-      setResultado(JSON.parse(stored));
+      const data = JSON.parse(stored);
+      // Compatibilidad con datos guardados antes del cambio (precioUSDC)
+      if (!data.precioMXN && data.precioUSDC) {
+        data.precioMXN = Math.round(data.precioUSDC * 19);
+      }
+      setResultado(data);
     }
 
     // Confetti café/beige
@@ -42,32 +49,16 @@ export default function PagoExitosoPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const copiarHash = async () => {
-    if (!resultado?.txHash) return;
-    await navigator.clipboard.writeText(resultado.txHash);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
-  };
-
-  // Hash real de Stellar: 64 caracteres hex. Los hashes "rizo-..." son de demo.
   const esHashReal = resultado?.txOnChain === true && /^[0-9a-fA-F]{64}$/.test(resultado?.txHash ?? "");
-  const hashCorto = esHashReal && resultado?.txHash
-    ? `${resultado.txHash.slice(0, 8)}…${resultado.txHash.slice(-8)}`
-    : "";
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] flex items-center justify-center p-6">
       <div className="max-w-md w-full space-y-6 text-center">
 
-        {/* Ícono de éxito */}
+        {/* Icono de exito */}
         <div className="flex justify-center">
-          <div className="relative">
-            <div className="w-24 h-24 bg-gradient-to-br from-[#8D6E63] to-[#BCAAA4] rounded-full flex items-center justify-center shadow-lg">
-              <CheckCircle className="w-12 h-12 text-white" />
-            </div>
-            <div className="absolute -top-2 -right-2 w-9 h-9 bg-yellow-400 rounded-full flex items-center justify-center shadow">
-              <Zap className="w-5 h-5 text-white fill-white" />
-            </div>
+          <div className="w-24 h-24 bg-gradient-to-br from-[#8D6E63] to-[#BCAAA4] rounded-full flex items-center justify-center shadow-lg">
+            <CheckCircle className="w-12 h-12 text-white" />
           </div>
         </div>
 
@@ -77,90 +68,64 @@ export default function PagoExitosoPage() {
             className="text-3xl font-bold text-[#3E2723]"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
-            ¡Pago completado!
+            ¡Compra completada!
           </h1>
           <p className="text-[#6D4C41]">
-            Tu transacción fue procesada en segundos ⚡️
+            Tu pedido fue confirmado al instante
           </p>
         </div>
 
-        {/* Detalles de la transacción */}
-        <div className="bg-white rounded-2xl border border-[#D7CCC8] p-6 text-left space-y-4">
+        {/* Detalles de la compra */}
+        <div className="bg-white rounded-2xl border border-[#D7CCC8] p-6 text-left space-y-3">
           <h3
             className="text-base font-semibold text-[#3E2723]"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
-            Detalles de la transacción
+            Detalles de tu compra
           </h3>
-          <div className="space-y-3">
-            {resultado?.producto && (
-              <div className="flex items-start justify-between gap-4">
-                <span className="text-sm text-[#A1887F] shrink-0">Producto</span>
-                <span className="text-sm font-medium text-[#3E2723] text-right line-clamp-2">
-                  {resultado.producto}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#A1887F]">Monto pagado</span>
-              <span className="text-base font-bold text-[#8D6E63]">
-                ${resultado?.precioUSDC ?? "—"} USDC
+
+          {resultado?.producto && (
+            <div className="flex items-start justify-between gap-4">
+              <span className="text-sm text-[#A1887F] shrink-0">Producto</span>
+              <span className="text-sm font-medium text-[#3E2723] text-right line-clamp-2">
+                {resultado.producto}
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#A1887F]">Tiempo de pago</span>
-              <span className="text-sm font-medium text-green-600">~3 segundos</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#A1887F]">Comisión de red</span>
-              <span className="text-sm font-medium text-green-600">$0.00</span>
-            </div>
+          )}
 
-            {/* Hash de la transacción */}
-            <div className="pt-2 border-t border-[#EFEBE9]">
-              {esHashReal ? (
-                <>
-                  <p className="text-xs text-[#A1887F] mb-2">Hash de transacción</p>
-                  <div className="flex items-center gap-2 bg-[#FAF8F5] rounded-xl px-3 py-2 mb-2">
-                    <span className="text-xs font-mono text-[#6D4C41] flex-1 truncate">
-                      {hashCorto}
-                    </span>
-                    <button
-                      onClick={copiarHash}
-                      className="shrink-0 text-[#A1887F] hover:text-[#8D6E63] transition-colors"
-                      title="Copiar hash completo"
-                    >
-                      {copiado ? (
-                        <Check className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                  <a
-                    href={`${STELLAR_EXPERT_URL}/${resultado!.txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full bg-[#3E2723] text-white py-2.5 rounded-xl text-xs font-semibold hover:bg-[#6D4C41] transition-colors"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Ver en Stellar Explorer
-                  </a>
-                </>
-              ) : (
-                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-                  <span className="text-amber-600 text-base">🔬</span>
-                  <div>
-                    <p className="text-xs font-semibold text-amber-700">Pago simulado — Modo demo</p>
-                    <p className="text-xs text-amber-600 mt-0.5">Sin USDC real en testnet. La compra y tokens son válidos.</p>
-                  </div>
-                </div>
-              )}
-            </div>
+          {resultado?.descuentoAplicado && resultado.descuentoAplicado > 0 && resultado.precioOriginal ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[#A1887F]">Precio original</span>
+                <span className="text-sm text-[#A1887F] line-through">
+                  ${resultado.precioOriginal.toLocaleString("es-MX")} MXN
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-green-700 font-medium">
+                  Descuento aplicado ({resultado.descuentoAplicado}%)
+                </span>
+                <span className="text-sm text-green-600 font-medium">
+                  -${(resultado.precioOriginal - resultado.precioMXN).toLocaleString("es-MX")} MXN
+                </span>
+              </div>
+            </>
+          ) : null}
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-[#A1887F]">Pagaste</span>
+            <span className="text-xl font-bold text-[#8D6E63]">
+              ${(resultado?.precioMXN ?? 0).toLocaleString("es-MX")} MXN
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-[#A1887F]">Comision</span>
+            <span className="text-sm font-medium text-green-600">$0.00</span>
           </div>
         </div>
 
-        {/* Tokens ganados */}
+        {/* Puntos ganados */}
         <div className="bg-gradient-to-br from-[#EFEBE9] to-[#D7CCC8] rounded-2xl p-6 border-2 border-[#BCAAA4]">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Gift className="w-5 h-5 text-[#8D6E63]" />
@@ -177,15 +142,15 @@ export default function PagoExitosoPage() {
           >
             +{resultado?.tokens ?? 100}
           </p>
-          <p className="text-sm text-[#6D4C41] font-medium">tokens RIZO</p>
+          <p className="text-sm text-[#6D4C41] font-medium">puntos RIZO</p>
           <div className="mt-3 pt-3 border-t border-[#BCAAA4]/50 grid grid-cols-2 gap-2 text-xs text-[#6D4C41]">
             <div className="bg-white/50 rounded-lg p-2">
-              <p className="font-semibold">500 tokens</p>
+              <p className="font-semibold">500 puntos</p>
               <p className="text-[#A1887F]">10% de descuento</p>
             </div>
             <div className="bg-white/50 rounded-lg p-2">
-              <p className="font-semibold">1,000 tokens</p>
-              <p className="text-[#A1887F]">Envío gratis</p>
+              <p className="font-semibold">1,000 puntos</p>
+              <p className="text-[#A1887F]">Envio gratis</p>
             </div>
           </div>
         </div>
@@ -196,7 +161,7 @@ export default function PagoExitosoPage() {
             onClick={() => router.push("/recompensas")}
             className="w-full bg-[#8D6E63] text-white py-3.5 rounded-2xl text-sm font-semibold hover:bg-[#6D4C41] transition-colors"
           >
-            Ver mis recompensas
+            Ver mis puntos RIZO
           </button>
           <button
             onClick={() => router.push("/tienda")}
@@ -209,6 +174,48 @@ export default function PagoExitosoPage() {
         <p className="text-xs text-[#A1887F]">
           Recibirás un correo con los detalles de tu compra
         </p>
+
+        {/* Transparencia blockchain */}
+        <div className="w-full border border-[#D7CCC8] rounded-2xl p-4 text-left space-y-2.5">
+          <p className="text-xs font-semibold text-[#A1887F] uppercase tracking-wider">
+            🔗 Transparencia blockchain
+          </p>
+          <p className="text-xs text-[#BCAAA4]">
+            Transacción verificada en Stellar Network
+          </p>
+          {esHashReal && resultado?.txHash ? (
+            <a
+              href={`${STELLAR_EXPERT_URL}/${resultado.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between group"
+            >
+              <span className="text-xs text-[#A1887F] font-mono truncate max-w-[200px]">
+                {resultado.txHash.slice(0, 8)}...{resultado.txHash.slice(-8)}
+              </span>
+              <span className="flex items-center gap-1 text-xs text-[#8D6E63] group-hover:underline shrink-0 ml-2">
+                Ver transacción <ExternalLink className="w-3 h-3" />
+              </span>
+            </a>
+          ) : (
+            <p className="text-xs text-[#BCAAA4] italic">Hash pendiente de confirmación on-chain</p>
+          )}
+          {CONTRACT_ID && (
+            <a
+              href={`https://stellar.expert/explorer/testnet/contract/${CONTRACT_ID}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between group"
+            >
+              <span className="text-xs text-[#A1887F] font-mono">
+                Smart contract: {CONTRACT_ID.slice(0, 8)}…{CONTRACT_ID.slice(-6)}
+              </span>
+              <span className="flex items-center gap-1 text-xs text-[#8D6E63] group-hover:underline shrink-0 ml-2">
+                Ver contrato <ExternalLink className="w-3 h-3" />
+              </span>
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );

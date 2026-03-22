@@ -1,7 +1,7 @@
-"use client";
+import type { Metadata } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
-import { SessionProvider } from "next-auth/react";
+import AuthSessionProvider from "@/app/session-provider";
 import Providers from "@/app/providers";
 
 const playfair = Playfair_Display({
@@ -16,6 +16,11 @@ const inter = Inter({
   display: "swap",
 });
 
+export const metadata: Metadata = {
+  title: "RIZO",
+  description: "Comunidad para cabello rizado",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -24,11 +29,11 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${playfair.variable} ${inter.variable}`}>
       <body className="min-h-full flex flex-col bg-[#FAF8F5]">
-        <SessionProvider>
+        <AuthSessionProvider>
           <Providers>
             {children}
           </Providers>
-        </SessionProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

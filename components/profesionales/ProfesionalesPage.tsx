@@ -10,7 +10,7 @@ interface Profesional {
   username: string;
   iniciales: string;
   especialidad: string;
-  categoria: Categoria;
+  categoria: string;
   emojiCategoria: string;
   ubicacion: string;
   calificacion: number;

@@ -6,10 +6,8 @@ import { useAccesly } from "accesly";
 import { Search, TrendingUp, Sparkles } from "lucide-react";
 
 const NEXT_MILESTONE = 500;
-// Tipo de conversión aproximado: 1 USDC ≈ 19 MXN
 const MXN_PER_USDC = 19;
 
-// Tipo que usa el checkout
 type ProductoCheckout = {
   id: string;
   nombre: string;
@@ -20,7 +18,6 @@ type ProductoCheckout = {
   tokens: number;
 };
 
-// Tipo que devuelve /api/products (modelo Prisma)
 type ProductoDB = {
   id: string;
   name: string;
@@ -42,7 +39,7 @@ function dbToUI(p: ProductoDB): ProductoCheckout & { tendencia: boolean; votes: 
     imagen: p.imageUrl ?? "",
     tokens: p.tokenPrice,
     votes: p.votes,
-    tendencia: false, // se calcula después de ordenar
+    tendencia: false,
   };
 }
 
@@ -79,12 +76,11 @@ function TarjetaProducto({
             {producto.nombre}
           </h4>
         </div>
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-lg font-bold text-[#8D6E63]">${producto.precioUSDC} USDC</span>
-          <span className="text-xs text-[#A1887F]">(${producto.precioMXN} MXN)</span>
-        </div>
+        <p className="text-lg font-bold text-[#8D6E63]">
+          ${producto.precioMXN.toLocaleString("es-MX")} MXN
+        </p>
         <div className="inline-flex items-center gap-1 bg-[#EFEBE9] text-[#6D4C41] text-xs font-medium px-2.5 py-1 rounded-full">
-          🪙 +{producto.tokens} tokens
+          🪙 +{producto.tokens} puntos
         </div>
       </div>
     </div>
@@ -95,20 +91,18 @@ export default function TiendaPage() {
   const [busqueda, setBusqueda] = useState("");
   const [productos, setProductos] = useState<(ProductoCheckout & { tendencia: boolean; votes: number })[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
-  const [tokens, setTokens] = useState<number | null>(null);
+  const [puntos, setPuntos] = useState<number | null>(null);
   const router = useRouter();
   const { data: session } = useSession();
   const { wallet } = useAccesly();
 
   const userEmail = session?.user?.email || wallet?.email;
 
-  // Cargar productos desde la BD
   useEffect(() => {
     fetch("/api/products")
       .then((r) => r.json())
       .then((data: ProductoDB[]) => {
         const mapped = data.map(dbToUI);
-        // Los 3 con más votos son "tendencia"
         const sorted = [...mapped].sort((a, b) => b.votes - a.votes);
         const topIds = new Set(sorted.slice(0, 3).map((p) => p.id));
         setProductos(mapped.map((p) => ({ ...p, tendencia: topIds.has(p.id) })));
@@ -117,12 +111,11 @@ export default function TiendaPage() {
       .finally(() => setLoadingProductos(false));
   }, []);
 
-  // Cargar tokens del usuario
   useEffect(() => {
     if (!userEmail) return;
     fetch(`/api/user/me?email=${encodeURIComponent(userEmail)}`)
       .then((r) => r.json())
-      .then((data) => { if (typeof data.tokens === "number") setTokens(data.tokens); })
+      .then((data) => { if (typeof data.tokens === "number") setPuntos(data.tokens); })
       .catch(() => {});
   }, [userEmail]);
 
@@ -168,7 +161,7 @@ export default function TiendaPage() {
           {/* Contenido principal */}
           <div className="lg:col-span-9 space-y-6">
 
-            {/* Banner USDC */}
+            {/* Banner */}
             <div className="bg-gradient-to-r from-[#8D6E63] to-[#BCAAA4] text-white px-6 py-6 rounded-2xl">
               <div className="flex items-center gap-3 mb-2">
                 <Sparkles className="w-6 h-6" />
@@ -176,12 +169,12 @@ export default function TiendaPage() {
                   className="text-lg font-semibold"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
-                  Paga con USDC y gana recompensas
+                  Compra y gana puntos RIZO
                 </h3>
               </div>
               <p className="text-sm opacity-90">
-                Cada compra te da tokens RIZO que puedes canjear por descuentos.
-                Pagos instantáneos en Stellar Network.
+                Cada compra te da puntos que puedes canjear por descuentos.
+                Apoya marcas mexicanas y cuida tu cabello rizado.
               </p>
             </div>
 
@@ -235,7 +228,7 @@ export default function TiendaPage() {
                       className="text-lg font-semibold text-[#3E2723]"
                       style={{ fontFamily: "var(--font-playfair)" }}
                     >
-                      {busqueda ? "Resultados de búsqueda" : "Todos los productos"}
+                      {busqueda ? "Resultados de busqueda" : "Todos los productos"}
                     </h3>
                     <p className="text-sm text-[#A1887F]">
                       {filtrados.length} {filtrados.length === 1 ? "producto" : "productos"}
@@ -252,7 +245,7 @@ export default function TiendaPage() {
                     <div className="flex flex-col items-center justify-center py-20 text-center">
                       <span className="text-4xl mb-3">🔍</span>
                       <p className="text-sm font-semibold text-[#3E2723]">Sin resultados</p>
-                      <p className="text-xs text-[#A1887F] mt-1">Intenta con otro término</p>
+                      <p className="text-xs text-[#A1887F] mt-1">Intenta con otro termino</p>
                     </div>
                   )}
                 </div>
@@ -288,34 +281,34 @@ export default function TiendaPage() {
                 💡 ¿Sabías que?
               </h4>
               <p className="text-xs text-[#6D4C41] leading-relaxed">
-                Cada compra apoya a una marca mexicana. Ganas tokens para descuentos futuros.
+                Cada compra apoya a una marca mexicana. Ganas puntos para descuentos futuros.
               </p>
             </div>
 
-            {/* Token balance */}
+            {/* Balance de puntos */}
             <div className="bg-white rounded-2xl border border-[#D7CCC8] p-5">
-              <p className="text-xs text-[#A1887F] mb-1">Mis tokens RIZO</p>
+              <p className="text-xs text-[#A1887F] mb-1">Mis puntos RIZO</p>
               <div className="flex items-end gap-1.5">
                 <span
                   className="text-3xl font-bold text-[#8D6E63]"
                   style={{ fontFamily: "var(--font-playfair)" }}
                 >
-                  {tokens !== null ? tokens : "—"}
+                  {puntos !== null ? puntos : "—"}
                 </span>
-                <span className="text-xs text-[#A1887F] mb-1">tokens</span>
+                <span className="text-xs text-[#A1887F] mb-1">puntos</span>
               </div>
               <div className="mt-3 h-1.5 rounded-full bg-[#EFEBE9] overflow-hidden">
                 <div
                   className="h-full rounded-full bg-[#8D6E63] transition-all duration-500"
-                  style={{ width: `${tokens !== null ? Math.min((tokens / NEXT_MILESTONE) * 100, 100) : 0}%` }}
+                  style={{ width: `${puntos !== null ? Math.min((puntos / NEXT_MILESTONE) * 100, 100) : 0}%` }}
                 />
               </div>
               <p className="text-xs text-[#A1887F] mt-1.5">
-                {tokens !== null
-                  ? tokens >= NEXT_MILESTONE
+                {puntos !== null
+                  ? puntos >= NEXT_MILESTONE
                     ? "¡Listo para canjear un descuento!"
-                    : `${NEXT_MILESTONE - tokens} tokens para tu próximo descuento`
-                  : "Inicia sesión para ver tus tokens"}
+                    : `${NEXT_MILESTONE - puntos} puntos para tu proximo descuento`
+                  : "Inicia sesion para ver tus puntos"}
               </p>
             </div>
           </div>

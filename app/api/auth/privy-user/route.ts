@@ -39,14 +39,19 @@ export async function POST(req: Request) {
         },
       });
 
-      await prisma.tokenTransaction.create({
-        data: {
-          userId: user.id,
-          amount: 20,
-          type: "GANADO",
-          reason: "Bienvenida a RIZO",
-        },
+      const yaExisteBienvenida = await prisma.tokenTransaction.findFirst({
+        where: { userId: user.id, reason: "Bienvenida a RIZO" },
       });
+      if (!yaExisteBienvenida) {
+        await prisma.tokenTransaction.create({
+          data: {
+            userId: user.id,
+            amount: 20,
+            type: "GANADO",
+            reason: "Bienvenida a RIZO",
+          },
+        });
+      }
 
       return NextResponse.json({
         id: user.id,

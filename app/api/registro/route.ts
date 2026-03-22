@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { crearCuentaStellar, establecerTrustline } from "@/lib/stellar";
+import { encryptSecret } from "@/lib/encryption";
 
 const prisma = new PrismaClient();
 
@@ -44,20 +45,25 @@ export async function POST(req: NextRequest) {
         email,
         password: hashedPassword,
         stellarPublicKey: stellarAccount.publicKey,
-        stellarSecretKey: stellarAccount.secretKey,
+        stellarSecretKey: encryptSecret(stellarAccount.secretKey),
         tokens: 20, // Tokens de bienvenida
       },
     });
 
-    // Registrar tokens de bienvenida
-    await prisma.tokenTransaction.create({
-      data: {
-        userId: user.id,
-        amount: 20,
-        type: "GANADO",
-        reason: "Bienvenida a RIZO",
-      },
+    // Registrar tokens de bienvenida (guard contra duplicados)
+    const yaExisteBienvenida = await prisma.tokenTransaction.findFirst({
+      where: { userId: user.id, reason: "Bienvenida a RIZO" },
     });
+    if (!yaExisteBienvenida) {
+      await prisma.tokenTransaction.create({
+        data: {
+          userId: user.id,
+          amount: 20,
+          type: "GANADO",
+          reason: "Bienvenida a RIZO",
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

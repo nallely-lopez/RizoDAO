@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useAccesly } from "accesly";
-import { ArrowLeft, Zap, AlertCircle } from "lucide-react";
+import { ArrowLeft, ShoppingBag, AlertCircle, CreditCard, X, Wallet } from "lucide-react";
+
+const MXN_PER_USDC = 19;
 
 type Producto = {
   id: string;
@@ -15,27 +17,40 @@ type Producto = {
   tokens: number;
 };
 
-type Balances = {
-  xlm: number;
-  usdc: number;
-  stellarAddress: string | null;
-  xlmPerUsdc: number;
-};
-
 export default function CheckoutPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const { wallet, connect } = useAccesly();
 
   const [producto, setProducto] = useState<Producto | null>(null);
-  const [balances, setBalances] = useState<Balances | null>(null);
-  const [loadingBalances, setLoadingBalances] = useState(false);
-  const [paymentAsset, setPaymentAsset] = useState<"USDC" | "XLM">("XLM");
+  const [saldoUSDC, setSaldoUSDC] = useState(0);
+  const [saldoSimulado, setSaldoSimulado] = useState(0);
   const [pagando, setPagando] = useState(false);
   const [errorPago, setErrorPago] = useState<string | null>(null);
+  const [modalRecarga, setModalRecarga] = useState(false);
+  const [montoRecarga, setMontoRecarga] = useState(200);
+  const [recargado, setRecargado] = useState(false);
+  const [descuento, setDescuento] = useState(0); // loyalty tier: 0, 10 o 15
+  const [codigoInput, setCodigoInput] = useState("");
+  const [codigoAplicado, setCodigoAplicado] = useState<{ code: string; discount: number; description: string } | null>(null);
+  const [validandoCodigo, setValidandoCodigo] = useState(false);
+  const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
 
   const userEmail = session?.user?.email || wallet?.email;
   const estaLogueado = !!userEmail;
+
+  // Descuento efectivo: el mayor entre loyalty tier y código canjeado
+  const descuentoEfectivo = Math.max(descuento, codigoAplicado?.discount ?? 0);
+  const fuenteDescuento = codigoAplicado && codigoAplicado.discount >= descuento
+    ? `Código ${codigoAplicado.code}`
+    : descuento > 0 ? "Descuento lealtad RIZO" : "";
+
+  // Saldo total en MXN
+  const saldoMXN = Math.round(saldoUSDC * MXN_PER_USDC) + saldoSimulado;
+  const precioConDescuento = producto
+    ? Math.round(producto.precioMXN * (1 - descuentoEfectivo / 100))
+    : 0;
+  const tienesSaldo = producto ? saldoMXN >= precioConDescuento : false;
 
   useEffect(() => {
     const stored = sessionStorage.getItem("productoSeleccionado");
@@ -46,32 +61,54 @@ export default function CheckoutPage() {
     }
   }, [router]);
 
-  // Cargar balances Stellar cuando tengamos email y producto
+  // Cargar saldo interno del usuario
   useEffect(() => {
-    if (!userEmail || !producto) return;
-    setLoadingBalances(true);
+    if (!userEmail) return;
     fetch(`/api/user/balances?email=${encodeURIComponent(userEmail)}`)
       .then((r) => r.json())
-      .then((data: Balances) => {
-        setBalances(data);
-        // Auto-seleccionar el mejor método disponible
-        if (data.usdc >= producto.precioUSDC) {
-          setPaymentAsset("USDC");
-        } else {
-          setPaymentAsset("XLM");
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingBalances(false));
-  }, [userEmail, producto?.id]);
+      .then((data) => { if (typeof data.usdc === "number") setSaldoUSDC(data.usdc); })
+      .catch(() => {});
+  }, [userEmail]);
 
-  const precioXLM = producto && balances
-    ? parseFloat((producto.precioUSDC * balances.xlmPerUsdc).toFixed(7))
-    : 0;
+  // Obtener descuento por lealtad desde el contrato Soroban
+  useEffect(() => {
+    if (!userEmail) return;
+    fetch(`/api/loyalty/discount?email=${encodeURIComponent(userEmail)}`)
+      .then((r) => r.json())
+      .then((data) => { if (typeof data.discount === "number") setDescuento(data.discount); })
+      .catch(() => {});
+  }, [userEmail]);
 
-  const tieneUsdcSuficiente = (balances?.usdc ?? 0) >= (producto?.precioUSDC ?? 0);
-  // Reservar ~2 XLM para fees y reserva mínima de cuenta
-  const tieneXlmSuficiente = (balances?.xlm ?? 0) >= precioXLM + 2;
+  const handleSimularRecarga = () => {
+    setSaldoSimulado((prev) => prev + montoRecarga);
+    setRecargado(true);
+    setTimeout(() => {
+      setModalRecarga(false);
+      setRecargado(false);
+    }, 1500);
+  };
+
+  const handleAplicarCodigo = async () => {
+    const code = codigoInput.trim().toUpperCase();
+    if (!code) return;
+    setValidandoCodigo(true);
+    setErrorCodigo(null);
+    try {
+      const res = await fetch(`/api/discount/validate?code=${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (!data.valid) {
+        setErrorCodigo(data.error || "Código inválido");
+        setCodigoAplicado(null);
+      } else {
+        setCodigoAplicado({ code, discount: data.discount, description: data.description });
+        setCodigoInput("");
+      }
+    } catch {
+      setErrorCodigo("Error al validar el código");
+    } finally {
+      setValidandoCodigo(false);
+    }
+  };
 
   const handlePagar = async () => {
     if (!userEmail || !producto) return;
@@ -87,8 +124,9 @@ export default function CheckoutPage() {
           productName: producto.nombre,
           precioUSDC: producto.precioUSDC,
           tokensGanados: producto.tokens,
-          paymentAsset,
-          precioXLM,
+          paymentAsset: "USDC",
+          precioXLM: 0,
+          discountCode: codigoAplicado?.code ?? null,
         }),
       });
 
@@ -105,7 +143,9 @@ export default function CheckoutPage() {
           txHash: data.txHash,
           txOnChain: data.txOnChain,
           producto: producto.nombre,
-          precioUSDC: producto.precioUSDC,
+          precioMXN: precioConDescuento,
+          precioOriginal: producto.precioMXN,
+          descuentoAplicado: descuentoEfectivo,
           tokens: data.tokensGanados,
         })
       );
@@ -119,10 +159,6 @@ export default function CheckoutPage() {
   };
 
   if (!producto) return null;
-
-  const pagoDeshabilitado = pagando ||
-    (paymentAsset === "USDC" && !tieneUsdcSuficiente) ||
-    (paymentAsset === "XLM" && !tieneXlmSuficiente);
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
@@ -140,7 +176,7 @@ export default function CheckoutPage() {
             className="text-lg font-semibold text-[#3E2723]"
             style={{ fontFamily: "var(--font-playfair)" }}
           >
-            Checkout
+            Confirmar compra
           </h1>
         </div>
       </header>
@@ -175,13 +211,12 @@ export default function CheckoutPage() {
               >
                 {producto.nombre}
               </h4>
-              <p className="text-xl font-bold text-[#8D6E63]">${producto.precioUSDC} USDC</p>
-              <p className="text-xs text-[#A1887F]">≈ ${producto.precioMXN} MXN</p>
+              <p className="text-xl font-bold text-[#8D6E63]">${producto.precioMXN} MXN</p>
             </div>
           </div>
         </div>
 
-        {/* Tokens que ganará */}
+        {/* Puntos que ganará */}
         <div className="bg-gradient-to-br from-[#EFEBE9] to-[#D7CCC8] rounded-2xl p-5 border border-[#BCAAA4]">
           <div className="flex items-center justify-between">
             <div>
@@ -190,116 +225,112 @@ export default function CheckoutPage() {
                 className="text-2xl font-bold text-[#8D6E63]"
                 style={{ fontFamily: "var(--font-playfair)" }}
               >
-                +{producto.tokens} tokens RIZO
+                +{producto.tokens} puntos RIZO
               </p>
               <p className="text-xs text-[#A1887F] mt-0.5">
-                500 tokens = 10% · 1,000 tokens = envío gratis
+                500 puntos = 10% · 1,000 puntos = envio gratis
               </p>
             </div>
             <span className="text-4xl">🎁</span>
           </div>
         </div>
 
-        {/* Selector de método de pago */}
+        {/* Código de descuento */}
         {estaLogueado && (
-          <div className="bg-white rounded-2xl border border-[#D7CCC8] p-5">
+          <div className="bg-white rounded-2xl border border-[#D7CCC8] p-5 space-y-3">
             <h3
-              className="text-sm font-semibold text-[#3E2723] mb-3"
+              className="text-sm font-semibold text-[#3E2723]"
               style={{ fontFamily: "var(--font-playfair)" }}
             >
-              Método de pago
+              Código de descuento
             </h3>
 
-            {loadingBalances ? (
-              <div className="flex justify-center py-4">
-                <span className="w-5 h-5 border-2 border-[#8D6E63] border-t-transparent rounded-full animate-spin" />
+            {codigoAplicado ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-green-700">
+                    {codigoAplicado.discount}% aplicado
+                  </p>
+                  <p className="text-xs text-green-600 font-mono">{codigoAplicado.code}</p>
+                </div>
+                <button
+                  onClick={() => setCodigoAplicado(null)}
+                  className="text-xs text-[#A1887F] hover:text-[#6D4C41] underline"
+                >
+                  Quitar
+                </button>
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={codigoInput}
+                  onChange={(e) => { setCodigoInput(e.target.value.toUpperCase()); setErrorCodigo(null); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleAplicarCodigo()}
+                  placeholder="RIZO-XXXXXX"
+                  className="flex-1 border border-[#D7CCC8] rounded-xl px-4 py-2.5 text-sm font-mono text-[#3E2723] placeholder-[#D7CCC8] focus:outline-none focus:border-[#8D6E63] bg-[#FAF8F5]"
+                />
+                <button
+                  onClick={handleAplicarCodigo}
+                  disabled={!codigoInput.trim() || validandoCodigo}
+                  className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#8D6E63] text-white hover:bg-[#6D4C41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {validandoCodigo ? "..." : "Aplicar"}
+                </button>
+              </div>
+            )}
 
-                  {/* Opción USDC */}
-                  <button
-                    onClick={() => setPaymentAsset("USDC")}
-                    disabled={!tieneUsdcSuficiente}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${
-                      paymentAsset === "USDC"
-                        ? "border-[#8D6E63] bg-[#EFEBE9]"
-                        : tieneUsdcSuficiente
-                        ? "border-[#D7CCC8] hover:border-[#8D6E63]"
-                        : "border-[#D7CCC8] opacity-40 cursor-not-allowed"
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-[#3E2723] mb-1">USDC</p>
-                    <p className="text-base font-bold text-[#8D6E63]">${producto.precioUSDC}</p>
-                    <p className={`text-xs mt-1.5 ${tieneUsdcSuficiente ? "text-green-600" : "text-red-500"}`}>
-                      Saldo: {(balances?.usdc ?? 0).toFixed(2)}
-                    </p>
-                  </button>
+            {errorCodigo && (
+              <p className="text-xs text-red-600">{errorCodigo}</p>
+            )}
+          </div>
+        )}
 
-                  {/* Opción XLM */}
-                  <button
-                    onClick={() => setPaymentAsset("XLM")}
-                    disabled={!tieneXlmSuficiente}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${
-                      paymentAsset === "XLM"
-                        ? "border-[#8D6E63] bg-[#EFEBE9]"
-                        : tieneXlmSuficiente
-                        ? "border-[#D7CCC8] hover:border-[#8D6E63]"
-                        : "border-[#D7CCC8] opacity-40 cursor-not-allowed"
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-[#3E2723] mb-1">XLM</p>
-                    <p className="text-base font-bold text-[#8D6E63]">~{precioXLM.toFixed(2)}</p>
-                    <p className={`text-xs mt-1.5 ${tieneXlmSuficiente ? "text-green-600" : "text-red-500"}`}>
-                      Saldo: {(balances?.xlm ?? 0).toFixed(2)}
-                    </p>
-                  </button>
+        {/* Saldo y método de pago */}
+        {estaLogueado && (
+          <div className="bg-white rounded-2xl border border-[#D7CCC8] p-5 space-y-4">
+            <h3
+              className="text-sm font-semibold text-[#3E2723]"
+              style={{ fontFamily: "var(--font-playfair)" }}
+            >
+              Metodo de pago
+            </h3>
+
+            {/* Saldo RIZO */}
+            <div className={`flex items-center justify-between p-4 rounded-xl border-2 ${
+              tienesSaldo ? "border-[#8D6E63] bg-[#EFEBE9]" : "border-[#D7CCC8] bg-[#FAF8F5]"
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#8D6E63] flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-white" />
                 </div>
-
-                {balances && (
-                  <p className="text-xs text-[#A1887F] text-center">
-                    1 USDC ≈ {balances.xlmPerUsdc.toFixed(2)} XLM · precio mercado
+                <div>
+                  <p className="text-sm font-semibold text-[#3E2723]">Saldo RIZO</p>
+                  <p className={`text-xs mt-0.5 font-medium ${tienesSaldo ? "text-green-600" : "text-[#A1887F]"}`}>
+                    Disponible: ${saldoMXN.toLocaleString("es-MX")} MXN
                   </p>
-                )}
+                </div>
+              </div>
+              {!tienesSaldo && (
+                <button
+                  onClick={() => setModalRecarga(true)}
+                  className="text-xs font-semibold text-[#8D6E63] bg-[#EFEBE9] px-3 py-1.5 rounded-full hover:bg-[#D7CCC8] transition-colors"
+                >
+                  Recargar
+                </button>
+              )}
+            </div>
 
-                {/* Instrucciones USDC cuando no tiene suficiente */}
-                {paymentAsset === "USDC" && !tieneUsdcSuficiente && (
-                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5">
-                    <p className="text-xs font-semibold text-amber-700">Cómo agregar USDC testnet con Freighter</p>
-                    <ol className="text-xs text-amber-600 space-y-1 list-decimal list-inside">
-                      <li>Abre Freighter → <strong>Manage Assets</strong></li>
-                      <li>Añade asset: código <code className="bg-amber-100 px-1 rounded">USDC</code></li>
-                      <li>Issuer: <code className="bg-amber-100 px-1 rounded text-[10px] break-all">GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5</code></li>
-                      <li>Intercambia XLM por USDC en el DEX de Stellar testnet</li>
-                    </ol>
-                    <button
-                      onClick={() => setPaymentAsset("XLM")}
-                      className="w-full mt-1 text-xs text-amber-700 font-semibold border border-amber-300 rounded-lg py-1.5 hover:bg-amber-100 transition-colors"
-                    >
-                      Mejor opción: pagar con XLM →
-                    </button>
-                  </div>
-                )}
-
-                {/* Faucet XLM si no tiene suficiente */}
-                {paymentAsset === "XLM" && !tieneXlmSuficiente && balances?.stellarAddress && (
-                  <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl p-3">
-                    <p className="text-xs font-semibold text-blue-700 mb-1.5">Tu wallet no tiene suficiente XLM</p>
-                    <a
-                      href={`https://friendbot.stellar.org?addr=${balances.stellarAddress}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1.5 w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors"
-                    >
-                      Obtener XLM gratis del faucet de Stellar
-                    </a>
-                    <p className="text-xs text-blue-500 mt-1.5 text-center">
-                      Recarga la página después de fondear.
-                    </p>
-                  </div>
-                )}
-              </>
+            {!tienesSaldo && (
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-700">Saldo insuficiente</p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    Necesitas ${producto.precioMXN} MXN. Recarga tu saldo para continuar.
+                  </p>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -309,26 +340,35 @@ export default function CheckoutPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-[#A1887F]">Subtotal</span>
-              <span className="text-sm font-medium text-[#3E2723]">
-                {paymentAsset === "XLM"
-                  ? `~${precioXLM.toFixed(2)} XLM`
-                  : `$${producto.precioUSDC} USDC`}
-              </span>
+              <span className="text-sm font-medium text-[#3E2723]">${producto.precioMXN} MXN</span>
             </div>
+            {descuentoEfectivo > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-green-700 font-medium">
+                  {fuenteDescuento} ({descuentoEfectivo}%)
+                </span>
+                <span className="text-sm font-medium text-green-600">
+                  -${producto.precioMXN - precioConDescuento} MXN
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-[#A1887F]">Comision de red</span>
+              <span className="text-sm text-[#A1887F]">Comision</span>
               <span className="text-sm font-medium text-green-600">$0.00</span>
             </div>
             <div className="border-t border-[#EFEBE9] pt-3 flex items-center justify-between">
               <span className="font-semibold text-[#3E2723]">Total</span>
-              <span
-                className="text-xl font-bold text-[#8D6E63]"
-                style={{ fontFamily: "var(--font-playfair)" }}
-              >
-                {paymentAsset === "XLM"
-                  ? `~${precioXLM.toFixed(2)} XLM`
-                  : `$${producto.precioUSDC} USDC`}
-              </span>
+              <div className="text-right">
+                {descuentoEfectivo > 0 && (
+                  <p className="text-xs text-[#A1887F] line-through">${producto.precioMXN} MXN</p>
+                )}
+                <span
+                  className="text-xl font-bold text-[#8D6E63]"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  ${precioConDescuento} MXN
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -347,34 +387,126 @@ export default function CheckoutPage() {
             onClick={connect}
             className="w-full flex items-center justify-center gap-2 bg-[#8D6E63] text-white py-4 rounded-2xl text-base font-semibold hover:bg-[#6D4C41] transition-colors"
           >
-            Conecta tu wallet para pagar
+            Inicia sesion para comprar
           </button>
         ) : (
-          <button
-            onClick={handlePagar}
-            disabled={pagoDeshabilitado}
-            className="w-full flex items-center justify-center gap-2 bg-[#8D6E63] text-white py-4 rounded-2xl text-base font-semibold hover:bg-[#6D4C41] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {pagando ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Procesando pago...
-              </>
-            ) : (
-              <>
-                <Zap className="w-5 h-5" />
-                {paymentAsset === "XLM"
-                  ? `Pagar ~${precioXLM.toFixed(2)} XLM`
-                  : `Pagar $${producto.precioUSDC} USDC`}
-              </>
+          <>
+            <button
+              onClick={handlePagar}
+              disabled={pagando || !tienesSaldo}
+              className="w-full flex items-center justify-center gap-2 bg-[#8D6E63] text-white py-4 rounded-2xl text-base font-semibold hover:bg-[#6D4C41] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {pagando ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <ShoppingBag className="w-5 h-5" />
+                  Confirmar compra
+                </>
+              )}
+            </button>
+
+            {!tienesSaldo && (
+              <button
+                onClick={() => setModalRecarga(true)}
+                className="w-full flex items-center justify-center gap-2 border-2 border-[#8D6E63] text-[#8D6E63] py-4 rounded-2xl text-base font-semibold hover:bg-[#EFEBE9] transition-colors"
+              >
+                <CreditCard className="w-5 h-5" />
+                Recargar saldo
+              </button>
             )}
-          </button>
+          </>
         )}
 
         <p className="text-xs text-center text-[#A1887F]">
           Pago seguro e instantaneo · Sin comisiones adicionales
         </p>
       </div>
+
+      {/* Modal Recargar Saldo */}
+      {modalRecarga && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 space-y-5">
+
+            <div className="flex items-center justify-between">
+              <h3
+                className="text-lg font-semibold text-[#3E2723]"
+                style={{ fontFamily: "var(--font-playfair)" }}
+              >
+                Recargar saldo
+              </h3>
+              <button
+                onClick={() => setModalRecarga(false)}
+                className="w-8 h-8 rounded-full bg-[#FAF8F5] flex items-center justify-center hover:bg-[#EFEBE9] transition-colors"
+              >
+                <X className="w-4 h-4 text-[#6D4C41]" />
+              </button>
+            </div>
+
+            {/* Montos predefinidos */}
+            <div>
+              <p className="text-xs text-[#A1887F] mb-3">Selecciona el monto a recargar:</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[100, 200, 500, 1000].map((monto) => (
+                  <button
+                    key={monto}
+                    onClick={() => setMontoRecarga(monto)}
+                    className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
+                      montoRecarga === monto
+                        ? "border-[#8D6E63] bg-[#EFEBE9] text-[#3E2723]"
+                        : "border-[#D7CCC8] text-[#6D4C41] hover:border-[#8D6E63]"
+                    }`}
+                  >
+                    ${monto}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Métodos de pago */}
+            <div className="space-y-2">
+              <p className="text-xs text-[#A1887F] mb-2">Metodo de pago:</p>
+
+              {[
+                { icono: "💳", nombre: "Tarjeta Visa / Mastercard" },
+                { icono: "🏪", nombre: "OXXO Pay" },
+                { icono: "🏦", nombre: "Transferencia SPEI" },
+              ].map((metodo) => (
+                <div
+                  key={metodo.nombre}
+                  className="flex items-center justify-between p-3 rounded-xl border border-[#D7CCC8] bg-[#FAF8F5]"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg">{metodo.icono}</span>
+                    <span className="text-sm text-[#6D4C41]">{metodo.nombre}</span>
+                  </div>
+                  <span className="text-xs font-medium text-[#A1887F] bg-[#EFEBE9] px-2 py-0.5 rounded-full">
+                    Proximamente
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Simular recarga */}
+            <button
+              onClick={handleSimularRecarga}
+              disabled={recargado}
+              className="w-full py-3.5 rounded-2xl text-sm font-semibold transition-all bg-[#8D6E63] text-white hover:bg-[#6D4C41] disabled:opacity-70"
+            >
+              {recargado
+                ? `✓ Saldo agregado: +$${montoRecarga} MXN`
+                : `Simular recarga de $${montoRecarga} MXN`}
+            </button>
+
+            <p className="text-xs text-center text-[#A1887F]">
+              Tu saldo estara disponible en segundos
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
