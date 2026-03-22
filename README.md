@@ -212,8 +212,7 @@ User sees: "+85 RIZO tokens earned!" 🎉
 
 ## 🔗 Links
 
-- 🌐 **Live Demo**: [rizo-app.vercel.app](https://rizo-app.vercel.app)
-- 🎥 **Demo Video**: [YouTube](https://youtube.com)
+- 🎥 **Demo Video**: [YouTube]([https://youtube.com](https://youtu.be/gOCZK7X_2pg?si=pehD1Y7r5IrufIxL))
 - 📊 **DoraHacks**: [BUIDL Page](https://dorahacks.io)
 - 🌟 **Stellar Expert**: [View Transactions](https://stellar.expert/explorer/testnet)
 
