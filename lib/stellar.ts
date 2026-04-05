@@ -6,14 +6,18 @@ const server = new StellarSdk.Horizon.Server(
 
 const networkPassphrase = StellarSdk.Networks.TESTNET;
 
-const issuerKeypair = StellarSdk.Keypair.fromSecret(
-  process.env.STELLAR_ISSUER_SECRET_KEY!
-);
+function getIssuerKeypair(): StellarSdk.Keypair {
+  const secret = process.env.STELLAR_ISSUER_SECRET_KEY;
+  if (!secret) throw new Error("STELLAR_ISSUER_SECRET_KEY is not set");
+  return StellarSdk.Keypair.fromSecret(secret);
+}
 
-export const RIZO_ASSET = new StellarSdk.Asset(
-  process.env.STELLAR_ASSET_CODE || "RIZO",
-  issuerKeypair.publicKey()
-);
+function getRizoAsset(): StellarSdk.Asset {
+  return new StellarSdk.Asset(
+    process.env.STELLAR_ASSET_CODE || "RIZO",
+    getIssuerKeypair().publicKey()
+  );
+}
 
 // Crear cuenta Stellar para un usuario nuevo
 export async function crearCuentaStellar(): Promise<{
@@ -47,7 +51,7 @@ export async function establecerTrustline(
     })
       .addOperation(
         StellarSdk.Operation.changeTrust({
-          asset: RIZO_ASSET,
+          asset: getRizoAsset(),
           limit: "1000000",
         })
       )
@@ -69,6 +73,7 @@ export async function enviarTokensRIZO(
   cantidad: number
 ): Promise<boolean> {
   try {
+    const issuerKeypair = getIssuerKeypair();
     const issuerAccount = await server.loadAccount(issuerKeypair.publicKey());
 
     const tx = new StellarSdk.TransactionBuilder(issuerAccount, {
@@ -78,7 +83,7 @@ export async function enviarTokensRIZO(
       .addOperation(
         StellarSdk.Operation.payment({
           destination: destinoPublicKey,
-          asset: RIZO_ASSET,
+          asset: getRizoAsset(),
           amount: cantidad.toString(),
         })
       )
@@ -126,8 +131,8 @@ export async function quemarTokensRIZO(
     })
       .addOperation(
         StellarSdk.Operation.payment({
-          destination: issuerKeypair.publicKey(),
-          asset: RIZO_ASSET,
+          destination: getIssuerKeypair().publicKey(),
+          asset: getRizoAsset(),
           amount: cantidad.toString(),
         })
       )
