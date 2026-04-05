@@ -65,10 +65,17 @@ export async function POST(req: NextRequest) {
     });
 
     // Otorgar tokens por publicar
-    await fetch(`${process.env.NEXTAUTH_URL}/api/tokens/otorgar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userEmail, accion: "PUBLICAR" }),
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { tokens: { increment: 5 } },
+    });
+    await prisma.tokenTransaction.create({
+      data: {
+        userId: user.id,
+        amount: 5,
+        type: "GANADO",
+        reason: "PUBLICAR en la plataforma",
+      },
     });
 
     return NextResponse.json({ success: true, post });
