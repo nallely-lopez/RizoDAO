@@ -204,9 +204,9 @@ User sees: "+85 RIZO tokens earned!" 🎉
 
 | Name | Role |
 |------|------|
-| Nallely López García | Lead Developer / Co-founder |
-| [Nombre] | Frontend Developer / Co-founder |
-| [Nombre] | Business Development / Pitcher |
+| Valeria Ortiz Montiel | Founder / Product Lead |
+| Nallely López García | Lead Developer |
+| Yeni Daniela Ojeda Gómez | Frontend Developer |
 
 ---
 
