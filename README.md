@@ -63,8 +63,8 @@ The platform combines three core features:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/tu-usuario/rizo-app.git
-cd rizo-app
+git clone https://github.com/nallely-lopez/RizoDAO.git
+cd RizoDAO
 ```
 
 2. Install dependencies:
