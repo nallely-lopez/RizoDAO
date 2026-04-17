@@ -1,4 +1,10 @@
 # 🌀 RIZO — Web3 Beauty Platform for the Latin Curly Hair Community
+![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)
+![Stellar](https://img.shields.io/badge/Stellar-Network-7B7BF7?style=flat-square&logo=stellar)
+![Vercel](https://img.shields.io/badge/Deployed-Vercel-black?style=flat-square&logo=vercel)
+![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=flat-square&logo=prisma)
+![TailwindCSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css)
 
 > Beauty meets Web3. Shop, connect with professionals, and earn 
 > on-chain loyalty tokens — powered by Stellar Network, invisibly.
