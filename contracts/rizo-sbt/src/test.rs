@@ -1,200 +1,192 @@
-//! Unit tests for the RizoSbt Soulbound Token contract.
-//!
-//! Run with: `cargo test --features testutils`
-
-#![cfg(test)]
-
 use super::*;
-use soroban_sdk::{testutils::Address as _, Env, String};
+use soroban_sdk::{testutils::{Address as _, Ledger as _}, Env, String};
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Test helpers ─────────────────────────────────────────────────────────────
 
-/// Deploy the contract and return an (Env, client, issuer_address) tuple.
-fn setup() -> (Env, RizoSbtClient<'static>, Address) {
+fn setup() -> (Env, Address, RizoSbtClient<'static>) {
     let env = Env::default();
     env.mock_all_auths();
+
     let contract_id = env.register_contract(None, RizoSbt);
     let client = RizoSbtClient::new(&env, &contract_id);
-    // SAFETY: lifetime is tied to `env` which lives for the entire test body.
+
+    // SAFETY: env outlives the test function — lifetime is artificially widened
+    // only so the tuple can be returned together. This pattern mirrors
+    // rizo-loyalty's own test setup.
     let client = unsafe {
         core::mem::transmute::<RizoSbtClient<'_>, RizoSbtClient<'static>>(client)
     };
-    let issuer = Address::generate(&env);
-    (env, client, issuer)
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    (env, admin, client)
 }
 
-// ─── Test 1: Mint increases credential count ──────────────────────────────────
+// ─── Test 1: mint creates a credential bound to the stylist ──────────────────
 
 #[test]
-fn test_mint_stores_credential() {
-    let (env, client, issuer) = setup();
+fn test_mint_creates_credential() {
+    let (env, _admin, client) = setup();
     let stylist = Address::generate(&env);
 
-    let token_id = client.mint_sbt(
-        &issuer,
-        &stylist,
-        &CredentialType::CurlSpecialist,
-        &String::from_str(&env, "Curl Specialist"),
-    );
+    let credential_type = String::from_str(&env, "curl_specialist");
+    let id = client.mint_sbt(&stylist, &credential_type);
 
-    assert_eq!(token_id, 1);
+    // ID must be a positive integer
+    assert!(id > 0);
 
+    // Credential must appear in get_credentials
     let creds = client.get_credentials(&stylist);
     assert_eq!(creds.len(), 1);
 
-    let token = creds.get(0).unwrap();
-    assert_eq!(token.id, 1);
-    assert_eq!(token.owner, stylist);
-    assert_eq!(token.metadata.issuer, issuer);
+    let cred = creds.get(0).unwrap();
+    assert_eq!(cred.id, id);
+    assert_eq!(cred.owner, stylist);
+    assert_eq!(cred.credential_type, CredentialType::CurlSpecialist);
 }
 
-// ─── Test 2: Multiple mints accumulate tokens on the same stylist ─────────────
+// ─── Test 2: all four credential types are accepted ──────────────────────────
 
 #[test]
-fn test_multiple_mints_accumulate() {
-    let (env, client, issuer) = setup();
+fn test_all_credential_types_accepted() {
+    let (env, _admin, client) = setup();
     let stylist = Address::generate(&env);
 
-    client.mint_sbt(
-        &issuer,
-        &stylist,
-        &CredentialType::CurlSpecialist,
-        &String::from_str(&env, "Curl Specialist"),
-    );
-    client.mint_sbt(
-        &issuer,
-        &stylist,
-        &CredentialType::ColorSpecialist,
-        &String::from_str(&env, "Color Specialist"),
-    );
-    client.mint_sbt(
-        &issuer,
-        &stylist,
-        &CredentialType::LocStylist,
-        &String::from_str(&env, "Loc Stylist"),
-    );
+    let types = [
+        "curl_specialist",
+        "natural_hair",
+        "loc_stylist",
+        "color_specialist",
+    ];
+
+    for ct in &types {
+        let s = String::from_str(&env, ct);
+        client.mint_sbt(&stylist, &s);
+    }
 
     let creds = client.get_credentials(&stylist);
-    assert_eq!(creds.len(), 3);
-    // IDs should be sequential
-    assert_eq!(creds.get(0).unwrap().id, 1);
-    assert_eq!(creds.get(1).unwrap().id, 2);
-    assert_eq!(creds.get(2).unwrap().id, 3);
-    assert_eq!(client.total_minted(), 3);
+    assert_eq!(creds.len(), 4);
 }
 
-// ─── Test 3: Credentials belong to distinct stylists independently ────────────
-
-#[test]
-fn test_credentials_are_per_stylist() {
-    let (env, client, issuer) = setup();
-    let stylist_a = Address::generate(&env);
-    let stylist_b = Address::generate(&env);
-
-    client.mint_sbt(
-        &issuer,
-        &stylist_a,
-        &CredentialType::NaturalHair,
-        &String::from_str(&env, "Natural Hair Specialist"),
-    );
-
-    // stylist_b has no credentials
-    let creds_b = client.get_credentials(&stylist_b);
-    assert_eq!(creds_b.len(), 0);
-
-    // stylist_a has exactly one
-    let creds_a = client.get_credentials(&stylist_a);
-    assert_eq!(creds_a.len(), 1);
-}
-
-// ─── Test 4: verify_credential returns true for a valid credential ────────────
+// ─── Test 3: verify_credential returns true for a valid credential ────────────
 
 #[test]
 fn test_verify_credential_valid() {
-    let (env, client, issuer) = setup();
+    let (env, _admin, client) = setup();
     let stylist = Address::generate(&env);
 
-    let token_id = client.mint_sbt(
-        &issuer,
-        &stylist,
-        &CredentialType::LocStylist,
-        &String::from_str(&env, "Loc Stylist"),
-    );
-
-    let valid = client.verify_credential(&stylist, &token_id);
-    assert!(valid);
+    let id = client.mint_sbt(&stylist, &String::from_str(&env, "natural_hair"));
+    let result = client.verify_credential(&stylist, &id);
+    assert!(result);
 }
 
-// ─── Test 5: verify_credential panics for a non-existent credential ───────────
+// ─── Test 4: verify_credential panics for wrong owner ────────────────────────
 
 #[test]
 #[should_panic]
-fn test_verify_credential_not_found() {
-    let (env, client, issuer) = setup();
+fn test_verify_credential_wrong_owner_panics() {
+    let (env, _admin, client) = setup();
     let stylist = Address::generate(&env);
+    let attacker = Address::generate(&env);
 
-    // Mint one credential to ensure the stylist exists in storage
-    client.mint_sbt(
-        &issuer,
-        &stylist,
-        &CredentialType::CurlSpecialist,
-        &String::from_str(&env, "Curl Specialist"),
-    );
+    let id = client.mint_sbt(&stylist, &String::from_str(&env, "loc_stylist"));
 
-    // Token ID 999 was never minted — must panic
-    client.verify_credential(&stylist, &999_u32);
+    // Attempting to verify with the wrong owner must panic
+    client.verify_credential(&attacker, &id);
 }
 
-// ─── Test 6: Transfer is always rejected ─────────────────────────────────────
+// ─── Test 5: transfer always panics with TransferNotAllowed ──────────────────
 
 #[test]
 #[should_panic]
 fn test_transfer_is_rejected() {
-    let (env, client, issuer) = setup();
-    let stylist = Address::generate(&env);
-    let other = Address::generate(&env);
+    let (env, _admin, client) = setup();
+    let owner = Address::generate(&env);
+    let recipient = Address::generate(&env);
 
-    let token_id = client.mint_sbt(
-        &issuer,
-        &stylist,
-        &CredentialType::ColorSpecialist,
-        &String::from_str(&env, "Color Specialist"),
-    );
+    let id = client.mint_sbt(&owner, &String::from_str(&env, "color_specialist"));
 
-    // Any transfer attempt must be explicitly rejected by the contract.
-    client.transfer(&stylist, &other, &token_id);
+    // Any transfer attempt must be explicitly rejected
+    client.transfer(&owner, &recipient, &id);
 }
 
-// ─── Test 7: SBT metadata is stored and retrievable correctly ────────────────
+// ─── Test 6: invalid credential type panics ──────────────────────────────────
 
 #[test]
-fn test_metadata_fields_are_correct() {
-    let (env, client, issuer) = setup();
+#[should_panic]
+fn test_invalid_credential_type_panics() {
+    let (env, _admin, client) = setup();
     let stylist = Address::generate(&env);
-    let name = String::from_str(&env, "Natural Hair Specialist");
 
-    let token_id = client.mint_sbt(
-        &issuer,
-        &stylist,
-        &CredentialType::NaturalHair,
-        &name,
-    );
+    // "braider" is not a valid credential type
+    client.mint_sbt(&stylist, &String::from_str(&env, "braider"));
+}
+
+// ─── Test 7: metadata fields are stored correctly ────────────────────────────
+
+#[test]
+fn test_metadata_fields_populated() {
+    let (env, admin, client) = setup();
+    let stylist = Address::generate(&env);
+
+    // Advance the ledger timestamp so issued_at is non-zero
+    env.ledger().with_mut(|li| {
+        li.timestamp = 1_700_000_000; // arbitrary Unix timestamp
+    });
+
+    let id = client.mint_sbt(&stylist, &String::from_str(&env, "color_specialist"));
 
     let creds = client.get_credentials(&stylist);
-    let token = creds.get(0).unwrap();
+    let cred = creds.get(0).unwrap();
 
-    assert_eq!(token.id, token_id);
-    assert_eq!(token.owner, stylist);
-    assert_eq!(token.metadata.issuer, issuer);
-    assert_eq!(token.metadata.credential_name, name);
-    // issued_at is a u64 ledger timestamp — just verify it is accessible
-    let _ = token.metadata.issued_at;
+    // name must be the human-readable certificate title
+    assert_eq!(
+        cred.name,
+        String::from_str(&env, "Color Specialist Certificate")
+    );
+    // issuer must be the admin who minted
+    assert_eq!(cred.issuer, admin);
+    // issued_at must reflect the ledger time we set
+    assert_eq!(cred.issued_at, 1_700_000_000);
+    // id must match the returned mint id
+    assert_eq!(cred.id, id);
 }
 
-// ─── Test 8: total_minted returns 0 before any mints ─────────────────────────
+// ─── Test 8: multiple stylists have independent credential lists ──────────────
 
 #[test]
-fn test_total_minted_starts_at_zero() {
-    let (_env, client, _issuer) = setup();
-    assert_eq!(client.total_minted(), 0);
+fn test_independent_credential_lists() {
+    let (env, _admin, client) = setup();
+    let stylist_a = Address::generate(&env);
+    let stylist_b = Address::generate(&env);
+
+    client.mint_sbt(&stylist_a, &String::from_str(&env, "curl_specialist"));
+    client.mint_sbt(&stylist_a, &String::from_str(&env, "natural_hair"));
+    client.mint_sbt(&stylist_b, &String::from_str(&env, "loc_stylist"));
+
+    assert_eq!(client.get_credentials(&stylist_a).len(), 2);
+    assert_eq!(client.get_credentials(&stylist_b).len(), 1);
+}
+
+// ─── Test 9: re-initialisation is rejected ───────────────────────────────────
+
+#[test]
+#[should_panic]
+fn test_double_initialize_panics() {
+    let (env, _admin, client) = setup();
+    let new_admin = Address::generate(&env);
+    // Second initialize call must panic
+    client.initialize(&new_admin);
+}
+
+// ─── Test 10: get_credentials returns empty list for unknown address ──────────
+
+#[test]
+fn test_get_credentials_empty_for_unknown_address() {
+    let (env, _admin, client) = setup();
+    let unknown = Address::generate(&env);
+
+    let creds = client.get_credentials(&unknown);
+    assert_eq!(creds.len(), 0);
 }
