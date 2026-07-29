@@ -26,10 +26,11 @@ type ProductoDB = {
   tokenPrice: number;
   imageUrl: string | null;
   category: string | null;
+  rating: number;
   votes: number;
 };
 
-function dbToUI(p: ProductoDB): ProductoCheckout & { tendencia: boolean; votes: number } {
+function dbToUI(p: ProductoDB): ProductoCheckout & { tendencia: boolean; votes: number; rating: number } {
   return {
     id: p.id,
     nombre: p.name,
@@ -39,6 +40,7 @@ function dbToUI(p: ProductoDB): ProductoCheckout & { tendencia: boolean; votes: 
     imagen: p.imageUrl ?? "",
     tokens: p.tokenPrice,
     votes: p.votes,
+    rating: p.rating,
     tendencia: false,
   };
 }
@@ -47,7 +49,7 @@ function TarjetaProducto({
   producto,
   onClick,
 }: {
-  producto: ProductoCheckout;
+  producto: ProductoCheckout & { rating?: number; votes?: number };
   onClick: () => void;
 }) {
   return (
@@ -82,6 +84,20 @@ function TarjetaProducto({
         <div className="inline-flex items-center gap-1 bg-[#EFEBE9] text-[#6D4C41] text-xs font-medium px-2.5 py-1 rounded-full">
           🪙 +{producto.tokens} puntos
         </div>
+
+        {producto.rating !== undefined && (
+          <div className="flex items-center gap-1">
+            {[1,2,3,4,5].map((star) => (
+              <span key={star} className="text-[10px]"
+                style={{ color: star <= Math.round(producto.rating ?? 0) ? "#C89B4F" : "#D7CCC8" }}>
+                ★
+              </span>
+            ))}
+            <span className="text-[10px] text-[#A1887F] ml-0.5">
+              ({producto.votes ?? 0})
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -89,7 +105,7 @@ function TarjetaProducto({
 
 export default function TiendaPage() {
   const [busqueda, setBusqueda] = useState("");
-  const [productos, setProductos] = useState<(ProductoCheckout & { tendencia: boolean; votes: number })[]>([]);
+  const [productos, setProductos] = useState<(ProductoCheckout & { tendencia: boolean; votes: number; rating: number })[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
   const [puntos, setPuntos] = useState<number | null>(null);
   const router = useRouter();
@@ -125,8 +141,7 @@ export default function TiendaPage() {
   const tendencias = productos.filter((p) => p.tendencia);
 
   const handleProductoClick = (producto: ProductoCheckout) => {
-    sessionStorage.setItem("productoSeleccionado", JSON.stringify(producto));
-    router.push("/checkout");
+    router.push(`/tienda/${producto.id}`);
   };
 
   return (
