@@ -30,6 +30,8 @@ model User {
   reviews       Review[]
   purchases     Purchase[]
   discountCodes DiscountCode[]
+  following     Follow[] @relation("FollowFollower")
+  followers     Follow[] @relation("FollowFollowing")
 }
 
 model Purchase {
@@ -120,6 +122,18 @@ model Appointment {
   status       String   @default("pending")
   stellarTxHash String?
   createdAt    DateTime @default(now())
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("FollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("FollowFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
 }
 
 enum Role {
