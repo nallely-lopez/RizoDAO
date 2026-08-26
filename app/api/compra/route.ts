@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import * as StellarSdk from "@stellar/stellar-sdk";
+import { sendPurchaseConfirmationEmail } from "@/lib/email";
 
 const prisma = new PrismaClient();
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
@@ -153,6 +154,18 @@ export async function POST(req: Request) {
           descuentoActivo = regla.tipo;
           break;
         }
+      }
+
+      if (user.email) {
+        await sendPurchaseConfirmationEmail({
+          to: user.email,
+          name: user.name ?? "",
+          productName,
+          precioUSDC,
+          tokensGanados,
+          stellarTxHash,
+          purchaseId: compra.id,
+        });
       }
     }
 

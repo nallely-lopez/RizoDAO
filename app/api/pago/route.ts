@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import * as StellarSdk from "@stellar/stellar-sdk";
 import { decryptSecret } from "@/lib/encryption";
 import { registerPurchase } from "@/lib/loyaltyContract";
+import { sendPurchaseConfirmationEmail } from "@/lib/email";
 
 const prisma = new PrismaClient();
 
@@ -120,6 +121,16 @@ export async function POST(req: Request) {
         data: { used: true, usedAt: new Date() },
       });
     }
+
+    await sendPurchaseConfirmationEmail({
+      to: user.email,
+      name: user.name ?? "",
+      productName,
+      precioUSDC,
+      tokensGanados,
+      stellarTxHash: txHash,
+      purchaseId: compra.id,
+    });
 
     return NextResponse.json({
       success: true,

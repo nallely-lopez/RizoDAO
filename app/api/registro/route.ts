@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { crearCuentaStellar, establecerTrustline } from "@/lib/stellar";
 import { encryptSecret } from "@/lib/encryption";
+import { sendWelcomeEmail } from "@/lib/email";
 
 const prisma = new PrismaClient();
 
@@ -64,6 +65,8 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+
+    await sendWelcomeEmail({ to: user.email, name: user.name ?? nombre });
 
     return NextResponse.json({
       success: true,
